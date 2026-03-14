@@ -5,6 +5,9 @@ import streamlit as st
 groq_key = st.secrets.get("GROQ_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
 os.environ["GROQ_API_KEY"] = groq_key
 
+serper_key = st.secrets.get("SERPER_API_KEY", "") or os.environ.get("SERPER_API_KEY", "")
+os.environ["SERPER_API_KEY"] = serper_key
+
 import re
 import numpy as np
 import requests
@@ -142,18 +145,18 @@ def load_pipeline():
         print(f"[TXT] Loaded program_data.txt ({len(txt_content)} chars)")
 
     urls = [
-        # Program pages
-        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems",
-        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/curriculum",
-        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/admissions",
-        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/fees",
-        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/careers",
-        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/faculty",
-        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/placements",
-        # Main site pages
-        "https://mastersunion.org/faculty",
-        "https://mastersunion.org/placements",
-    ]
+    # ✅ Main program page (confirmed working)
+    "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+
+    # ✅ Apply now page (has admissions + fees info)
+    "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems-applynow",
+
+    # ✅ Main site (awards, rankings, accreditations)
+    "https://mastersunion.org/",
+
+    # ✅ Contact page
+    "https://mastersunion.org/contact-us",
+]
     web_docs = scrape_website(urls)
 
     all_docs = pdf_docs + txt_docs + web_docs
@@ -248,25 +251,126 @@ def get_best_sentence(query, chunk_text):
 # ── Web Search Fallback ───────────────────────────────────────────────────────
 def web_search_fallback(query):
     """
-    Search the web in real time when local knowledge base
-    doesn't have enough information.
+    Real-time web search using Google Serper API.
+    Falls back to direct website fetch if API key not set.
     """
+
+    # ── Method 1: Google Serper (most reliable) ───────────────────────────────
+    serper_key = os.environ.get("SERPER_API_KEY", "")
+    if serper_key:
+        try:
+            headers = {
+                "X-API-KEY": serper_key,
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "q": f"Masters Union PGP AI {query}",
+                "num": 5
+            }
+            resp = requests.post(
+                "https://google.serper.dev/search",
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            data = resp.json()
+
+            results = []
+
+            # Answer box (best source)
+            if "answerBox" in data:
+                box = data["answerBox"]
+                results.append(box.get("answer", "") or box.get("snippet", ""))
+
+            # Organic results
+            for item in data.get("organic", [])[:4]:
+                title = item.get("title", "")
+                snippet = item.get("snippet", "")
+                if snippet:
+                    results.append(f"{title}: {snippet}")
+
+            # Knowledge graph
+            if "knowledgeGraph" in data:
+                kg = data["knowledgeGraph"]
+                desc = kg.get("description", "")
+                if desc:
+                    results.append(desc)
+
+            combined = "\n\n".join([r for r in results if r])
+            if combined:
+                print(f"[SEARCH] Serper found {len(results)} results")
+                return combined
+
+        except Exception as e:
+            print(f"[SEARCH] Serper failed: {e}")
+
+    # ── Method 2: DuckDuckGo (free alternative) ───────────────────────────────
     try:
         from duckduckgo_search import DDGS
         with DDGS() as ddgs:
             results = list(ddgs.text(
-                f"Masters Union PGP AI program {query}",
+                f"Masters Union PGP AI {query}",
                 max_results=4
             ))
-        if not results:
-            return ""
-        combined = ""
-        for r in results:
-            combined += f"{r.get('title', '')}\n{r.get('body', '')}\n\n"
-        return combined.strip()
+        if results:
+            print(f"[SEARCH] DuckDuckGo found {len(results)} results")
+            combined = ""
+            for r in results:
+                combined += f"{r.get('title','')}\n{r.get('body','')}\n\n"
+            return combined.strip()
+        else:
+            print("[SEARCH] DuckDuckGo returned empty")
     except Exception as e:
-        print(f"[SEARCH] Web search failed: {e}")
-        return ""
+        print(f"[SEARCH] DuckDuckGo failed: {e}")
+
+    # ── Method 3: Direct website fetch (no API needed) ────────────────────────
+    try:
+        page_map = {
+            "faculty":    "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+            "professor":  "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+            "mentor":     "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+            "compan":     "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+            "placement":  "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+            "hire":       "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+            "salary":     "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems",
+            "award":      "https://mastersunion.org/",
+            "news":       "https://mastersunion.org/",
+            "rank":       "https://mastersunion.org/",
+            "accredit":   "https://mastersunion.org/",
+            "batch":      "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems-applynow",
+            "intake":     "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems-applynow",
+            "fee":        "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems-applynow",
+            "apply":      "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems-applynow",
+            "admission":  "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems-applynow",
+        }
+
+        target_url = "https://mastersunion.org/pgp-in-applied-ai-and-agentic-systems"
+        q_lower = query.lower()
+        for keyword, url in page_map.items():
+            if keyword in q_lower:
+                target_url = url
+                break
+
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        resp = requests.get(target_url, headers=headers, timeout=10)
+
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            for tag in soup(["script", "style", "nav", "footer", "header"]):
+                tag.decompose()
+            lines = [
+                l.strip() for l in
+                soup.get_text(separator="\n", strip=True).split("\n")
+                if len(l.strip()) > 30
+            ]
+            result = "\n".join(lines[:60])
+            print(f"[SEARCH] Direct fetch: {len(result)} chars from {target_url}")
+            return result
+
+    except Exception as e:
+        print(f"[SEARCH] Direct fetch failed: {e}")
+
+    return ""
 
 # ── Prompt with simple history ────────────────────────────────────────────────
 def build_prompt(query, context):
@@ -318,18 +422,31 @@ def process_query(query):
             context = "\n\n".join(top_docs)
 
             # Check if local context is thin — trigger web search
-            low_context = len(context.strip()) < 300
+            low_context = len(context.strip()) < 500
             faculty_query = any(w in query.lower() for w in
                 ["faculty", "professor", "mentor", "instructor", "teacher"])
             company_query = any(w in query.lower() for w in
                 ["compan", "hire", "recruit", "employer", "who hires"])
+            news_query = any(w in query.lower() for w in
+                ["award", "news", "recent", "latest", "2024", "2025",
+                 "reddit", "quora", "review", "ranking", "rank"])
+            low_confidence = confidence < 0.45
 
             web_context = ""
-            if low_context or faculty_query or company_query:
-                with st.spinner("Searching web for latest info..."):
+            print(f"[DEBUG] low_context={low_context} faculty={faculty_query} company={company_query} news={news_query} low_conf={low_confidence}")
+
+            if low_context or faculty_query or company_query or news_query or low_confidence:
+                print(f"[DEBUG] Triggering web search for: {query}")
+                with st.spinner("🌐 Searching web for latest info..."):
                     web_context = web_search_fallback(query)
+                print(f"[DEBUG] Web search returned {len(web_context)} chars")
                 if web_context:
+                    print(f"[DEBUG] Web result preview: {web_context[:200]}")
                     context = context + "\n\nWEB SEARCH RESULTS:\n" + web_context
+                else:
+                    print("[DEBUG] Web search returned empty — no web context added")
+            else:
+                print("[DEBUG] Web search NOT triggered")
 
             prompt = build_prompt(query, context)
             response = llm.invoke(prompt)
