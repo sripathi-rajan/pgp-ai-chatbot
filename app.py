@@ -13,6 +13,10 @@ from langchain_classic.memory import ConversationBufferWindowMemory
 from rank_bm25 import BM25Okapi
 from transformers import pipeline as hf_pipeline
 
+import os
+import streamlit as st
+os.environ["GROQ_API_KEY"] = st.secrets.get("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", os.environ.get("GROQ_API_KEY", ""))
+
 st.set_page_config(page_title="PGP AI Assistant", page_icon="🎓")
 st.title("🎓 PGP AI Program Assistant")
 st.caption("Hybrid RAG · Intent Routing · Hallucination Guardrails")
@@ -55,7 +59,10 @@ def assign_title(text):
 # ── Load Pipeline ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_pipeline():
-    loader = PyPDFLoader("brochure.pdf")
+    import os
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    PDF_PATH = os.path.join(BASE_DIR, "brochure.pdf")
+    loader = PyPDFLoader(PDF_PATH)
     documents = loader.load()
     for doc in documents:
         doc.page_content = clean_ocr(doc.page_content)
