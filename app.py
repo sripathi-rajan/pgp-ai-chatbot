@@ -129,6 +129,18 @@ def load_pipeline():
     PDF_PATH = os.path.join(BASE_DIR, "brochure.pdf")
     pdf_docs = extract_pdf(PDF_PATH)
 
+    # Load supplementary text documentation
+    txt_docs = []
+    TXT_PATH = os.path.join(BASE_DIR, "program_data.txt")
+    if os.path.exists(TXT_PATH):
+        with open(TXT_PATH, "r", encoding="utf-8") as f:
+            txt_content = f.read()
+        txt_docs.append(Document(
+            page_content=txt_content,
+            metadata={"source": "program_data.txt", "page": "documentation"}
+        ))
+        print(f"[TXT] Loaded program_data.txt ({len(txt_content)} chars)")
+
     urls = [
         # Program pages
         "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems",
@@ -144,8 +156,8 @@ def load_pipeline():
     ]
     web_docs = scrape_website(urls)
 
-    all_docs = pdf_docs + web_docs
-    print(f"[PIPELINE] PDF: {len(pdf_docs)} | Web: {len(web_docs)} | Total: {len(all_docs)}")
+    all_docs = pdf_docs + txt_docs + web_docs
+    print(f"[PIPELINE] PDF: {len(pdf_docs)} | TXT: {len(txt_docs)} | Web: {len(web_docs)} | Total: {len(all_docs)}")
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,

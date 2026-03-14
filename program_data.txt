@@ -1,0 +1,592 @@
+PGP in Applied AI & Agentic Systems
+Detailed Explanation of the Programme
+1. Programme Overview
+
+The PGP in Applied AI & Agentic Systems is a 15-month intensive postgraduate programme designed to train engineers and technology professionals to design, build, and deploy real-world Artificial Intelligence systems and autonomous agents.
+
+Unlike traditional AI programmes that focus mainly on theoretical concepts or isolated tools, this programme emphasizes system-level thinking and practical implementation. Students learn how to integrate multiple AI technologies including:
+
+Machine Learning
+
+Automation systems
+
+Data Engineering
+
+AI Governance
+
+AI system architecture
+
+The programme aims to develop professionals capable of building reliable, production-ready AI systems that solve real industry problems.
+
+A key characteristic of the programme is its hands-on approach. Students build one AI system every term, resulting in six complete AI systems over six academic terms.
+
+This structure ensures that learners graduate with practical experience and a portfolio of AI projects rather than only theoretical knowledge.
+
+2. Programme Structure
+Duration
+
+The programme runs for 15 months.
+
+During this period students:
+
+Complete 6 academic terms
+
+Build 6 real-world AI systems
+
+Work on real datasets and business problems
+
+Learn through a project-centric learning model
+
+This makes the programme highly practical and industry-oriented.
+
+3. Learning Model
+
+The programme follows an applied, project-centric, industry-aligned pedagogy.
+
+Key features include:
+
+Hands-on Learning
+
+Students learn by building systems rather than just studying concepts.
+
+Industry Integration
+
+Learning involves real industry case studies, business problems, and datasets.
+
+System-Level Thinking
+
+Students learn how AI systems work as complete products, including:
+
+Model development
+
+Data pipelines
+
+Deployment systems
+
+Monitoring
+
+Governance
+
+This approach prepares students to develop production-ready AI solutions rather than just experimental models.
+
+4. Programme Location and Format
+
+The programme is conducted at the Gurugram campus.
+
+However, two learning modes are available.
+
+Offline Weekday Programme
+
+This format is designed for fresh graduates or early career engineers.
+
+Features include
+
+it must be like a documentation.
+
+So the glossy brochure wasn’t enough and now you want it converted into a proper documentation-style text. Fair. Marketing PDFs love hiding real information behind dramatic fonts and shiny gradients. Let’s turn it into something that actually reads like a technical document instead of a recruitment poster.
+
+Below is a structured documentation version of the entire PDF, written in formal documentation style.
+
+PGP in Applied AI & Agentic Systems
+Programme Documentation
+
+Source document:
+
+1. Programme Overview
+
+The PGP in Applied AI & Agentic Systems is a 15-month postgraduate professional programme designed to train individuals in building real-world Artificial Intelligence systems and autonomous agents.
+
+The programme focuses on applied intelligence, where participants learn how to design, build, deploy, and maintain production-grade AI systems used in industry.
+
+Unlike conventional AI courses that emphasize theoretical concepts or isolated tools, this programme emphasizes system-level thinking and practical implementation.
+
+Students learn to integrate multiple components of modern AI systems including:
+
+Machine Learning models
+
+Data engineering pipelines
+
+Automation systems
+
+AI agents and autonomous workflows
+
+Retrieval-Augmented Generation (RAG) systems
+
+AI governance and responsible AI practices
+
+The objective of the programme is to develop professionals capable of delivering reliable and scalable AI solutions for real-world applications.
+
+2. Programme Duration
+
+The programme duration is 15 months.
+
+During this time students complete:
+
+6 academic terms
+
+6 AI system projects
+
+A combination of in-class learning and out-class applied projects
+
+Each academic term focuses on a specific stage of AI system development.
+
+3. Learning Philosophy
+
+The programme is built around an applied, project-centric learning model.
+
+Key Characteristics
+3.1 Project-Based Learning
+
+Students build practical AI systems rather than only studying theoretical concepts.
+
+3.2 Industry-Aligned Curriculum
+
+The curriculum is designed in collaboration with industry experts to match current AI industry requirements.
+
+3.3 System-Level Understanding
+
+Students learn how to design complete AI systems, including:
+
+Data acquisition and processing
+
+Model training and evaluation
+
+Deployment and monitoring
+
+Automation and workflow integration
+
+3.4 Real-World Problem Solving
+
+The programme focuses on solving real business problems using AI technologies.
+
+4. Programme Location and Delivery Modes
+
+The programme is delivered from the Masters’ Union campus in Gurugram, India.
+
+Two learning modes are available.
+
+5. Learning Modes
+5.1 Offline Weekday Programme
+
+This format is designed for recent graduates and early-career engineers who want to start a career in AI and data science.
+
+Key Features
+
+Full-time learning on campus
+
+Weekday classes
+
+Studio and laboratory access
+
+Mentorship sessions
+
+Collaborative team projects
+
+Campus build sprints and hackathons
+
+Target Participants
+
+B.Tech graduates
+
+BCA graduates
+
+Computer Science or related fields
+
+Final year students or recent graduates
+
+Career Support
+
+Participants receive:
+
+Placement support
+
+Internship assistance
+
+Career mentoring
+
+5.2 Online Weekend Programme
+
+This format is designed for working professionals transitioning into Applied AI roles.
+
+Key Features
+
+Live weekend classes
+
+Flexible weekday learning
+
+Self-paced assignments
+
+Practical implementation within current job roles
+
+Participants can apply the concepts directly within their organizations by building AI systems for real workplace problems.
+
+Career Support
+
+Participants receive:
+
+Career transition support
+
+Portfolio development guidance
+
+Role transition into Applied AI positions
+
+6. Faculty and Industry Experts
+
+The programme includes instruction and mentorship from over 200 industry experts, CTOs, and AI leaders from global technology companies.
+
+Example Industry Experts
+
+Nitin Gaur – Former Director at IBM
+
+Sumoya Ghosh – Googler Experience Partner
+
+Divij Bajaj – Data and Applied Scientist at Microsoft
+
+Ujjyaini Mitra – Former Chief Data Officer at Zee
+
+Vaibhav Gupta – Senior Product Manager at MakeMyTrip
+
+Edward W Rogers – Former Chief Knowledge Officer at NASA
+
+Tarun Malik – Former Product Manager at Microsoft
+
+Siddarth Padmanabhan – Former Partner Manager at Facebook
+
+Dr. Nandini Seth – Professor at Masters’ Union, PhD from IIM Bangalore
+
+Shashank Sharma – Former Executive at Nestlé
+
+Malthi Satish – Director of Product at PayPal
+
+Karan Bhyana – Business Intelligence Generalist at Google
+
+Industry experts contribute through:
+
+Live lectures
+
+System design reviews
+
+Industry case studies
+
+Mentorship sessions
+
+7. Curriculum Structure
+
+The curriculum is divided into two complementary tracks:
+
+In-class Curriculum
+
+Out-class Curriculum
+
+The in-class curriculum focuses on theoretical understanding and technical development.
+
+The out-class curriculum focuses on practical implementation through projects.
+
+8. In-Class Curriculum
+
+The in-class curriculum is organized across six academic terms.
+
+Term 1: Data Analytics and AI Foundations
+
+Students learn the foundational skills required to work with data and AI systems.
+
+Topics include:
+
+Statistics
+
+SQL
+
+Data visualization
+
+Prompt engineering
+
+Data exploration techniques
+
+Students develop their first functional AI chatbot.
+
+Term 2: Agents and Automation with Modern AI
+
+This term focuses on the architecture of AI agents and automation systems.
+
+Topics include:
+
+AI agent design
+
+API integration
+
+Workflow automation
+
+Classical machine learning methods
+
+Students learn how AI systems can automate business operations.
+
+Term 3: Applied Machine Learning for Real Decisions
+
+Students build machine learning systems used for decision-making.
+
+Topics include:
+
+Model training
+
+Model evaluation
+
+Model optimization
+
+Model deployment
+
+Communicating insights to stakeholders
+
+Machine learning models are applied to business strategy and operational decision-making.
+
+Term 4: Retrieval-Augmented Generation (RAG), Neural Networks and Data Engineering
+
+Students learn advanced AI architecture and data infrastructure.
+
+Topics include:
+
+Retrieval-Augmented Generation (RAG)
+
+Neural network fundamentals
+
+Data pipeline engineering
+
+AI infrastructure design
+
+Students build scalable AI assistants capable of retrieving knowledge from private data.
+
+Term 5: Domain AI and Enterprise Machine Learning Design
+
+This term focuses on domain-specific AI solutions.
+
+Topics include:
+
+Supervised learning
+
+Time series forecasting
+
+Reinforcement learning
+
+Domain constraints
+
+Ethical AI practices
+
+Regulatory compliance
+
+Students design AI systems tailored to specific industries.
+
+Term 6: MLOps, Governance and AI Leadership
+
+The final term focuses on deploying and managing enterprise AI systems.
+
+Topics include:
+
+MLOps pipelines
+
+Continuous Integration and Continuous Deployment (CI/CD)
+
+AI monitoring systems
+
+Responsible AI frameworks
+
+AI system governance
+
+AI leadership and strategy
+
+Students develop enterprise-grade AI solutions ready for production environments.
+
+9. Out-Class Curriculum
+
+The out-class curriculum involves building six real-world AI systems.
+
+Term 1
+
+Applied AI Chatbot Challenge
+Students design chatbots that solve real operational problems.
+
+Term 2
+
+Agentic AI Accelerator
+Students build autonomous AI agents capable of executing workflows.
+
+Term 3
+
+AI Application in Industry
+Students analyze business data using machine learning methods.
+
+Term 4
+
+RAG System Building Challenge
+Students create domain-specific AI assistants using Retrieval-Augmented Generation.
+
+Term 5–6
+
+AI Industry Immersion
+Students develop AI systems for industries such as:
+
+Retail
+
+Healthcare
+
+Finance
+
+These projects result in market-ready AI solutions.
+
+10. Admission Requirements
+
+Applicants must satisfy the following criteria.
+
+Educational Qualification
+
+A Bachelor’s degree is required.
+
+Typical degrees include:
+
+B.Tech
+
+BCA
+
+Computer Science or related disciplines
+
+Professional Experience
+
+Work experience is required only for working professional applicants.
+
+Skills
+
+Applicants should demonstrate:
+
+Analytical thinking
+
+Problem-solving ability
+
+Interest in AI systems
+
+11. Selection Process
+
+The selection process consists of four stages.
+
+Application Submission
+
+Scholastic Technical Test
+
+Technical Interview
+
+Admission Decision
+
+The process evaluates the candidate’s readiness for a build-intensive AI programme.
+
+12. Programme Fee Structure
+
+The total programme cost is:
+
+INR 22,65,000
+
+Payment Schedule
+Stage	Amount	Deadline
+Admission Offer Acceptance	₹75,000	Within 30 days of offer
+Programme Commencement	₹10,95,000	Before classes begin
+Mid-Programme Installment	₹10,95,000	After 3 months
+13. Scholarships and Financial Support
+
+Scholarships are awarded based on:
+
+Academic merit
+
+Professional achievements
+
+Personal circumstances
+
+Financial Support Options
+
+Up to 100% scholarship on programme fee
+
+90+ scholarships available for the class
+
+100% loan coverage available for programme and hostel fees
+
+14. Ideal Candidates
+
+The programme is designed for individuals who want to build careers in Data Science and Applied AI.
+
+Suitable candidates include those who:
+
+Want to transition into AI careers
+
+Prefer learning through practical system building
+
+Want to graduate with a portfolio of real AI products
+
+Are interested in solving industry problems using AI
+
+15. Career Opportunities
+
+Graduates can pursue careers in AI, data science, and machine learning.
+
+Example Companies
+
+Students have secured opportunities in companies such as:
+
+Google
+
+Meta
+
+Apple
+
+Microsoft
+
+Samsung
+
+Amazon
+
+Paytm
+
+Accenture
+
+Flipkart
+
+Cisco
+
+ServiceNow
+
+Sprinklr
+
+Bain & Company
+
+Fractal
+
+Tata
+
+Cognizant
+
+CRISIL
+
+Salary Statistics
+
+Average CTC: ₹33.39 LPA
+
+Domestic Average CTC: ₹30.72 LPA
+
+Highest CTC: ₹1.28 Crore
+
+16. Entrepreneurship Opportunities
+
+The programme also supports students interested in building startups.
+
+Examples of student ventures include:
+
+MEMOTAG – AI-powered wearable technology for dementia support
+
+VKYD Labs – Digital fashion platform for virtual avatars
+
+TheGoodBrowser – AI-based search engine
+
+GuarderX – AI-powered CCTV analytics platform
+
+Some student founders have appeared on Shark Tank India.
+
+17. Contact Information
+
+Prospective students can contact the admissions team using the following details:
+
+Phone: +91 8929361765
+Email: pgadmissions@mastersunion.org
