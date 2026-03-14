@@ -12,3 +12,7 @@ torch
 scikit-learn
 numpy
 pypdf
+pdfplumber
+beautifulsoup4
+requests
+duckduckgo-search

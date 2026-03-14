@@ -130,11 +130,17 @@ def load_pipeline():
     pdf_docs = extract_pdf(PDF_PATH)
 
     urls = [
+        # Program pages
         "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems",
         "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/curriculum",
         "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/admissions",
         "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/fees",
         "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/careers",
+        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/faculty",
+        "https://mastersunion.org/programs/pgp-applied-ai-agentic-systems/placements",
+        # Main site pages
+        "https://mastersunion.org/faculty",
+        "https://mastersunion.org/placements",
     ]
     web_docs = scrape_website(urls)
 
@@ -179,21 +185,21 @@ if "chat_history" not in st.session_state:
 # ── Intent Detection ──────────────────────────────────────────────────────────
 def detect_intent(query):
     labels = [
-        "fees and cost",
-        "curriculum and syllabus",
-        "admissions and eligibility",
-        "career outcomes and placements",
-        "program overview and duration"
+        "fees, cost, scholarships and payment",
+        "curriculum, syllabus, modules and course topics",
+        "admissions, eligibility, how to apply and application process",
+        "career outcomes, placements, hiring companies and salary",
+        "program overview, duration, format and structure"
     ]
     result = classifier(query, candidate_labels=labels)
     top = result["labels"][0]
     score = result["scores"][0]
     intent_map = {
-        "fees and cost": "💰 Fees",
-        "curriculum and syllabus": "📚 Curriculum",
-        "admissions and eligibility": "📋 Admissions",
-        "career outcomes and placements": "🚀 Career",
-        "program overview and duration": "🎓 Overview"
+        "fees, cost, scholarships and payment": "💰 Fees",
+        "curriculum, syllabus, modules and course topics": "📚 Curriculum",
+        "admissions, eligibility, how to apply and application process": "📋 Admissions",
+        "career outcomes, placements, hiring companies and salary": "🚀 Career",
+        "program overview, duration, format and structure": "🎓 Overview"
     }
     return intent_map[top], score
 
@@ -227,6 +233,29 @@ def get_best_sentence(query, chunk_text):
     best_idx = int(np.argmax(sims))
     return sentences[best_idx], float(sims[best_idx])
 
+# ── Web Search Fallback ───────────────────────────────────────────────────────
+def web_search_fallback(query):
+    """
+    Search the web in real time when local knowledge base
+    doesn't have enough information.
+    """
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.text(
+                f"Masters Union PGP AI program {query}",
+                max_results=4
+            ))
+        if not results:
+            return ""
+        combined = ""
+        for r in results:
+            combined += f"{r.get('title', '')}\n{r.get('body', '')}\n\n"
+        return combined.strip()
+    except Exception as e:
+        print(f"[SEARCH] Web search failed: {e}")
+        return ""
+
 # ── Prompt with simple history ────────────────────────────────────────────────
 def build_prompt(query, context):
     history_text = ""
@@ -238,14 +267,16 @@ def build_prompt(query, context):
     return f"""You are a helpful assistant for the PGP AI program at Masters' Union.
 
 STRICT RULES:
-1. Answer ONLY using the context and conversation history below.
-2. Use conversation history to resolve "that", "it", "those" etc.
-3. If someone asks about EMI or installments, look for payment schedule info.
-4. If truly not in context, say: "I don't have that specific detail. Please contact the admissions team."
-5. Never invent numbers, dates, or names.
-6. Be concise, use bullet points, format fees with ₹ symbol.
+1. Answer using the context below — which includes brochure, website, and live web search results.
+2. Prefer brochure/website info. Use web search results only to fill gaps.
+3. Use conversation history to resolve "that", "it", "those" etc.
+4. If someone asks about faculty, list names and roles if found in context.
+5. If someone asks about companies, list company names if found in context.
+6. If truly not found anywhere, say: "I don't have that detail. Please contact admissions at pgadmissions@mastersunion.org"
+7. Never invent numbers, dates, or names.
+8. Be concise, use bullet points, format fees with ₹ symbol.
 {history_text}
-CONTEXT FROM BROCHURE AND WEBSITE:
+CONTEXT (Brochure + Website + Web Search):
 {context}
 
 Question: {query}
@@ -273,6 +304,21 @@ def process_query(query):
 
             top_docs = hybrid_retrieve(query, k=5)
             context = "\n\n".join(top_docs)
+
+            # Check if local context is thin — trigger web search
+            low_context = len(context.strip()) < 300
+            faculty_query = any(w in query.lower() for w in
+                ["faculty", "professor", "mentor", "instructor", "teacher"])
+            company_query = any(w in query.lower() for w in
+                ["compan", "hire", "recruit", "employer", "who hires"])
+
+            web_context = ""
+            if low_context or faculty_query or company_query:
+                with st.spinner("Searching web for latest info..."):
+                    web_context = web_search_fallback(query)
+                if web_context:
+                    context = context + "\n\nWEB SEARCH RESULTS:\n" + web_context
+
             prompt = build_prompt(query, context)
             response = llm.invoke(prompt)
             answer = response.content
@@ -374,9 +420,9 @@ with st.sidebar:
         "What topics are covered?",
         "What is the program duration?",
         "What companies hire graduates?",
-        "Is there an EMI option?",
+        "Who are the faculty members?",
         "What is the selection process?",
-        "Who are the faculty?",
+        "What is the average salary after graduation?",
     ]
     for q in sample_questions:
         if st.button(q, use_container_width=True):
