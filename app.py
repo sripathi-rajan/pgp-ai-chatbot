@@ -5,8 +5,7 @@ import streamlit as st
 groq_key = st.secrets.get("GROQ_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
 os.environ["GROQ_API_KEY"] = groq_key
 
-serper_key = st.secrets.get("SERPER_API_KEY", "") or os.environ.get("SERPER_API_KEY", "")
-os.environ["SERPER_API_KEY"] = serper_key
+os.environ["SERPER_API_KEY"] = "d5bcdac004d7861c6e8074f67e8337c0612d73b6"
 
 import re
 import numpy as np
@@ -20,7 +19,6 @@ from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_groq import ChatGroq
 from rank_bm25 import BM25Okapi
-from transformers import pipeline as hf_pipeline
 
 st.set_page_config(page_title="PGP AI Assistant", page_icon="🎓")
 st.title("🎓 PGP AI Program Assistant")
@@ -179,10 +177,9 @@ def load_pipeline():
     tokenized = [t.lower().split() for t in texts]
     bm25 = BM25Okapi(tokenized)
 
-    classifier = hf_pipeline(
-        "zero-shot-classification",
-        model="facebook/bart-large-mnli"
-    )
+    # Step 7: Lightweight intent classifier (no model download needed)
+    classifier = None
+    print("[PIPELINE] Using fast keyword intent classifier")
 
     llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
@@ -199,24 +196,68 @@ if "chat_history" not in st.session_state:
 
 # ── Intent Detection ──────────────────────────────────────────────────────────
 def detect_intent(query):
-    labels = [
-        "fees, cost, scholarships and payment",
-        "curriculum, syllabus, modules and course topics",
-        "admissions, eligibility, how to apply and application process",
-        "career outcomes, placements, hiring companies and salary",
-        "program overview, duration, format and structure"
-    ]
-    result = classifier(query, candidate_labels=labels)
-    top = result["labels"][0]
-    score = result["scores"][0]
-    intent_map = {
-        "fees, cost, scholarships and payment": "💰 Fees",
-        "curriculum, syllabus, modules and course topics": "📚 Curriculum",
-        "admissions, eligibility, how to apply and application process": "📋 Admissions",
-        "career outcomes, placements, hiring companies and salary": "🚀 Career",
-        "program overview, duration, format and structure": "🎓 Overview"
+    """
+    Fast keyword-based intent classifier.
+    No model download — instant response.
+    """
+    q = query.lower()
+
+    scores = {
+        "💰 Fees": 0,
+        "📚 Curriculum": 0,
+        "📋 Admissions": 0,
+        "🚀 Career": 0,
+        "🎓 Overview": 0,
     }
-    return intent_map[top], score
+
+    # Fee keywords
+    fee_words = ["fee", "cost", "price", "pay", "scholarship",
+                 "emi", "installment", "amount", "money",
+                 "discount", "loan", "₹", "inr", "afford", "expensive"]
+    scores["💰 Fees"] += sum(2 for w in fee_words if w in q)
+
+    # Curriculum keywords
+    curr_words = ["curriculum", "course", "topic", "subject", "module",
+                  "syllabus", "learn", "teach", "study", "term",
+                  "cover", "content", "what do", "what will"]
+    scores["📚 Curriculum"] += sum(2 for w in curr_words if w in q)
+
+    # Admissions keywords
+    adm_words = ["apply", "admission", "eligible", "eligibility",
+                 "criteria", "requirement", "qualify", "selection",
+                 "process", "how to join", "enroll", "register",
+                 "application", "interview", "test", "step"]
+    scores["📋 Admissions"] += sum(2 for w in adm_words if w in q)
+
+    # Career keywords
+    car_words = ["career", "job", "placement", "company", "hire",
+                 "salary", "ctc", "lpa", "package", "recruit",
+                 "employer", "graduate", "outcome", "opportunity",
+                 "work", "role", "position"]
+    scores["🚀 Career"] += sum(2 for w in car_words if w in q)
+
+    # Overview keywords
+    ov_words = ["duration", "long", "month", "overview", "about",
+                "format", "online", "offline", "campus", "structure",
+                "programme", "program", "what is", "tell me",
+                "explain", "describe", "general"]
+    scores["🎓 Overview"] += sum(2 for w in ov_words if w in q)
+
+    # Get best match
+    best_intent = max(scores, key=scores.__getitem__)
+    best_score = scores[best_intent]
+
+    # Calculate confidence
+    total = sum(scores.values())
+    if total == 0:
+        return "🎓 Overview", 0.40
+    confidence = min(best_score / total + 0.3, 0.99)
+
+    # Default if nothing matched
+    if best_score == 0:
+        return "🎓 Overview", 0.35
+
+    return best_intent, confidence
 
 # ── Hybrid Retrieval ──────────────────────────────────────────────────────────
 def hybrid_retrieve(query, k=5):
@@ -420,7 +461,7 @@ def process_query(query):
 
             top_docs = hybrid_retrieve(query, k=5)
             context = "\n\n".join(top_docs)
-
+            
             # Check if local context is thin — trigger web search
             low_context = len(context.strip()) < 500
             faculty_query = any(w in query.lower() for w in
@@ -429,20 +470,26 @@ def process_query(query):
                 ["compan", "hire", "recruit", "employer", "who hires"])
             news_query = any(w in query.lower() for w in
                 ["award", "news", "recent", "latest", "2024", "2025",
-                 "reddit", "quora", "review", "ranking", "rank"])
-            low_confidence = confidence < 0.45
+                 "reddit", "quora", "review", "ranking", "rank",
+                 "batch", "intake", "size", "accreditat", "recogni"])
+            low_confidence = confidence < 0.60
+
+            # Always search web if any trigger fires
+            should_search = low_context or faculty_query or company_query or news_query or low_confidence
+
+            print(f"[DEBUG] Query: {query}")
+            print(f"[DEBUG] Triggers: low_context={low_context} faculty={faculty_query} "
+                  f"company={company_query} news={news_query} low_conf={low_confidence}")
+            print(f"[DEBUG] Will search web: {should_search}")
 
             web_context = ""
-            print(f"[DEBUG] low_context={low_context} faculty={faculty_query} company={company_query} news={news_query} low_conf={low_confidence}")
-
-            if low_context or faculty_query or company_query or news_query or low_confidence:
-                print(f"[DEBUG] Triggering web search for: {query}")
+            if should_search:
                 with st.spinner("🌐 Searching web for latest info..."):
                     web_context = web_search_fallback(query)
-                print(f"[DEBUG] Web search returned {len(web_context)} chars")
+                print(f"[DEBUG] Web returned {len(web_context)} chars")
                 if web_context:
-                    print(f"[DEBUG] Web result preview: {web_context[:200]}")
                     context = context + "\n\nWEB SEARCH RESULTS:\n" + web_context
+                    print(f"[DEBUG] Preview: {web_context[:300]}")
                 else:
                     print("[DEBUG] Web search returned empty — no web context added")
             else:
@@ -450,7 +497,7 @@ def process_query(query):
 
             prompt = build_prompt(query, context)
             response = llm.invoke(prompt)
-            answer = response.content
+        answer = response.content
 
         st.write(answer)
 
