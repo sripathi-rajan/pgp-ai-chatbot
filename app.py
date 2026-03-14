@@ -15,7 +15,10 @@ from transformers import pipeline as hf_pipeline
 
 import os
 import streamlit as st
-os.environ["GROQ_API_KEY"] = st.secrets.get("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", os.environ.get("GROQ_API_KEY", ""))
+
+# Read from Streamlit secrets (cloud) or environment (local)
+groq_key = st.secrets.get("GROQ_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
+os.environ["GROQ_API_KEY"] = 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
 
 st.set_page_config(page_title="PGP AI Assistant", page_icon="🎓")
 st.title("🎓 PGP AI Program Assistant")
