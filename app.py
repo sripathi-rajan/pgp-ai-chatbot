@@ -1,5 +1,4 @@
 import os
-os.environ["GROQ_API_KEY"] = "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"
 
 import re
 import numpy as np
@@ -78,7 +77,7 @@ def load_pipeline():
         model="facebook/bart-large-mnli"
     )
 
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=st.secrets["GROQ_API_KEY"])
 
     return db, bm25, texts, chunks, embeddings, classifier, llm
 
