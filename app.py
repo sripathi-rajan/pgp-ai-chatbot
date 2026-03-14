@@ -62,13 +62,25 @@ def load_pipeline():
     import os
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PDF_PATH = os.path.join(BASE_DIR, "brochure.pdf")
+    
+    if not os.path.exists(PDF_PATH):
+        raise FileNotFoundError(f"Brochure PDF not found at {PDF_PATH}. Please ensure brochure.pdf is in the same directory as app.py.")
+    
     loader = PyPDFLoader(PDF_PATH)
     documents = loader.load()
+    
+    if not documents:
+        raise ValueError("No documents loaded from PDF. Please check the PDF file.")
+    
     for doc in documents:
         doc.page_content = clean_ocr(doc.page_content)
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
     chunks = splitter.split_documents(documents)
+    
+    if not chunks:
+        raise ValueError("No text chunks created from documents. Please check the PDF content.")
+    
     texts = [c.page_content for c in chunks]
 
     embeddings = HuggingFaceEmbeddings(
