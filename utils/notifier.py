@@ -1,36 +1,39 @@
 import smtplib
 import json
 import os
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
 FLAGGED_PATH = "data/flagged_queries.json"
+_lock = threading.Lock()
 
 
 def _save_to_json(query: str, chat_history: list, answer_attempt: str) -> None:
     """Always save flagged query locally so admin can review even if email fails."""
-    existing = []
-    if os.path.exists(FLAGGED_PATH):
-        try:
-            with open(FLAGGED_PATH, "r", encoding="utf-8") as f:
-                existing = json.load(f)
-        except Exception:
-            existing = []
-
     history_snippet = [{"role": r, "msg": m} for r, m in chat_history[-4:]] if chat_history else []
-
-    existing.append({
+    entry = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "query": query,
         "chat_history": history_snippet,
         "answer_attempt": answer_attempt[:500],
         "resolved": False,
-    })
+    }
 
-    os.makedirs("data", exist_ok=True)
-    with open(FLAGGED_PATH, "w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
+    with _lock:
+        existing = []
+        if os.path.exists(FLAGGED_PATH):
+            try:
+                with open(FLAGGED_PATH, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+            except Exception:
+                existing = []
+
+        existing.append(entry)
+        os.makedirs("data", exist_ok=True)
+        with open(FLAGGED_PATH, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2, ensure_ascii=False)
 
     print(f"[FLAGGED] Saved to {FLAGGED_PATH}: {query[:60]}")
 

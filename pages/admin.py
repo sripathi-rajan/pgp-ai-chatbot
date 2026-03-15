@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import streamlit as st
 
 FLAGGED_PATH = "data/flagged_queries.json"
@@ -13,9 +14,12 @@ if "admin_authenticated" not in st.session_state:
     st.session_state.admin_authenticated = False
 
 if not st.session_state.admin_authenticated:
+    correct = st.secrets.get("ADMIN_PASSWORD")
+    if not correct:
+        st.error("ADMIN_PASSWORD is not configured in secrets.toml. Login is disabled.")
+        st.stop()
     pwd = st.text_input("Admin Password", type="password")
     if st.button("Login"):
-        correct = st.secrets.get("ADMIN_PASSWORD", "pgpadmin2024")
         if pwd == correct:
             st.session_state.admin_authenticated = True
             st.rerun()
@@ -84,8 +88,10 @@ st.subheader("🔄 Reload Knowledge Base")
 st.caption("After saving new answers above, reload so the bot learns them immediately.")
 
 if st.button("Reload Knowledge Base", type="primary", use_container_width=True):
+    if os.path.exists("./faiss_index"):
+        shutil.rmtree("./faiss_index")
     st.cache_resource.clear()
-    st.success("Cache cleared. The bot will re-index all data on the next query.")
+    st.success("Index deleted and cache cleared — will rebuild on next query.")
 
 # ── Manual FAQ entry ──────────────────────────────────────────────────────────
 st.divider()

@@ -2,7 +2,7 @@ import re
 
 def clean_ocr(text):
     text = text.replace('\xa0', ' ')
-    text = re.sub(r'(?<=[A-Za-z])\s(?=[A-Za-z])', '', text)
+    text = re.sub(r'\b([A-Za-z])\s(?=[A-Za-z]\b)', r'\1', text)
     text = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', text)
     text = re.sub(r'(\d)\s+(\d)', r'\1\2', text)
     text = re.sub(r'\s*,\s*', ', ', text)

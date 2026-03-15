@@ -3,7 +3,10 @@
     "allow": [
       "Bash(pip install:*)",
       "Bash(playwright install:*)",
-      "Bash(python src/mastersunion_scraper.py)"
+      "Bash(python src/mastersunion_scraper.py)",
+      "Bash(findstr /v UserWarning)",
+      "Bash(findstr /v \"pydantic\\\\|FieldInfo\\\\|Pydantic\")",
+      "Bash(python -c \":*)"
     ]
   }
 }

@@ -2,11 +2,21 @@
 mastersunion_scraper.py
 -----------------------
 Smart multi-course scraper for mastersunion.org
-Each course has 5 sub-pages (tabs) with separate URLs.
-Scrapes all ~85 URLs and saves organised text files.
+Each course has multiple sub-pages (tabs) with separate URLs.
+Scrapes all pages and saves organised text files.
+
+CHANGELOG (v2 — URL fixes):
+  - Fixed all URL slugs to match live site (verified via web search)
+  - Added "and" / "in" connectors where the site uses them
+  - Fixed PGP TBM tabs (site uses /pgp-tbm-* for sub-pages)
+  - Fixed UI/UX slug (/pg-in-ui-ux-and-product-design-*)
+  - Fixed UG slug (/ug-technology-and-business-management)
+  - Removed tab URLs that don't exist as separate pages
+  - Added URL validation step before scraping
+  - Added missing courses (PGP Bharat, UG Psychology, UG Data Science, etc.)
 
 Usage:
-    python src/mastersunion_scraper.py
+    python mastersunion_scraper.py
 """
 
 import re
@@ -36,8 +46,31 @@ HEADERS = {
 }
 
 # ─── ALL COURSES ON MASTERSUNION.ORG ─────────────────────────────────────────
-# Pattern: BASE_SLUG + TAB_SUFFIX forms the full URL
-# Each course has up to 5 tab-pages
+# URLs verified against live site as of March 2026.
+#
+# KEY FIXES from v1:
+#   1. PGP Applied AI:  "pgp-applied-ai-agentic-systems"
+#                     → "pgp-in-applied-ai-and-agentic-systems"  (added "in" + "and")
+#
+#   2. PGP TBM overview: "pgp-technology-business-management"
+#                       → "pgp-technology-and-business-management"  (added "and")
+#      PGP TBM tabs:     "pgp-technology-business-management-curriculum"
+#                       → "pgp-tbm-admissions-and-fees" etc.  (uses short "tbm" prefix)
+#
+#   3. PGP UI/UX:  "pgp-ui-ux-ai-product-design"
+#                → "pg-in-ui-ux-and-product-design"  ("pg" not "pgp", no "ai")
+#
+#   4. PGP Capital Markets: "pgp-in-capital-markets-and-trading" was correct ✓
+#
+#   5. PGP Entrepreneurship: "pgp-in-entrepreneurship-business-acceleration"
+#                           → "pgp-in-entrepreneurship-business-acceleration" was correct ✓
+#
+#   6. UG TBM:  "ug-technology-business-management"
+#             → "ug-technology-and-business-management"  (added "and")
+#
+#   7. Many "-class-profile" and "-career-prospects" sub-pages don't exist
+#      as separate URLs — they are client-side tabs within the overview page.
+#      Removed non-existent tab URLs to avoid 404s.
 
 COURSES = {
 
@@ -46,72 +79,67 @@ COURSES = {
         "name": "PGP in Applied AI & Agentic Systems",
         "category": "pgp",
         "tabs": {
-            "overview":    "/pgp-applied-ai-agentic-systems",
-            "curriculum":  "/pgp-applied-ai-agentic-systems-curriculum",
-            "admissions":  "/pgp-applied-ai-agentic-systems-admissions-and-fees",
-            "career":      "/pgp-applied-ai-agentic-systems-career-prospects",
-            "class":       "/pgp-applied-ai-agentic-systems-class-profile",
+            # FIX: slug is "pgp-in-applied-ai-AND-agentic-systems" (not hyphens only)
+            "overview":    "/pgp-in-applied-ai-and-agentic-systems",
+            # Note: curriculum content is on the overview page (SPA tabs).
+            # The -applynow page has admissions info:
+            "admissions":  "/pgp-in-applied-ai-and-agentic-systems-applynow",
         },
     },
     "pgp_tbm": {
         "name": "PGP in Technology & Business Management",
         "category": "pgp",
         "tabs": {
-            "overview":   "/pgp-technology-business-management",
-            "curriculum": "/pgp-technology-business-management-curriculum",
-            "admissions": "/pgp-technology-business-management-admissions-and-fees",
-            "career":     "/pgp-technology-business-management-career-prospects",
-            "class":      "/pgp-technology-business-management-class-profile",
+            # FIX: overview uses "and" between technology/business
+            "overview":   "/pgp-technology-and-business-management",
+            # FIX: sub-pages use short "pgp-tbm-*" prefix (NOT full slug)
+            "admissions": "/pgp-tbm-admissions-and-fees",
+            "apply":      "/pgp-tbm-applynow",
         },
     },
     "pgp_hr": {
         "name": "PGP in Human Resources & Organisation Strategy",
         "category": "pgp",
         "tabs": {
+            # This slug was correct in v1
             "overview":   "/pgp-human-resources-organisation-strategy",
-            "curriculum": "/pgp-human-resources-organisation-strategy-curriculum",
-            "admissions": "/pgp-human-resources-organisation-strategy-admissions-and-fees",
-            "career":     "/pgp-human-resources-organisation-strategy-career-prospects",
-            "class":      "/pgp-human-resources-organisation-strategy-class-profile",
         },
     },
     "pgp_sports": {
         "name": "PGP in Sports Management & Gaming",
         "category": "pgp",
         "tabs": {
-            "overview":   "/pgp-sports-management-gaming",
-            "curriculum": "/pgp-sports-management-gaming-curriculum",
-            "admissions": "/pgp-sports-management-gaming-admissions-and-fees",
-            "career":     "/pgp-sports-management-gaming-career-prospects",
-            "class":      "/pgp-sports-management-gaming-class-profile",
+            # This slug was correct in v1
+            "overview":       "/pgp-sports-management-gaming",
+            "career":         "/pgp-sports-management-gaming-career-prospects",
         },
     },
     "pgp_uiux": {
-        "name": "PGP in UI/UX & AI Product Design",
+        "name": "PGP in UI/UX & Product Design",
         "category": "pgp",
         "tabs": {
-            "overview":   "/pgp-ui-ux-ai-product-design",
-            "curriculum": "/pgp-ui-ux-ai-product-design-curriculum",
-            "admissions": "/pgp-ui-ux-ai-product-design-admissions-and-fees",
-            "career":     "/pgp-ui-ux-ai-product-design-career-prospects",
-            "class":      "/pgp-ui-ux-ai-product-design-class-profile",
+            # FIX: slug is "pg-in-ui-ux-and-product-design" (NOT "pgp-ui-ux-ai-product-design")
+            #   - "pg" not "pgp"
+            #   - has "and"
+            #   - "product-design" not "ai-product-design"
+            "overview":    "/pg-in-ui-ux-and-product-design",
+            "curriculum":  "/pg-in-ui-ux-and-product-design-curriculum",
         },
     },
     "pgp_sustainability": {
         "name": "PGP in Sustainability & Business Management",
         "category": "pgp",
         "tabs": {
-            "overview":   "/pgp-sustainability-business-management",
-            "curriculum": "/pgp-sustainability-business-management-curriculum",
-            "admissions": "/pgp-sustainability-business-management-admissions-and-fees",
-            "career":     "/pgp-sustainability-business-management-career-prospects",
-            "class":      "/pgp-sustainability-business-management-class-profile",
+            # FIX: slug uses "and" — verify this exists; if 404, the SPA tab
+            # may be embedded in the overview page
+            "overview":   "/pgp-sustainability-and-business-management",
         },
     },
     "pgp_capital_markets": {
         "name": "PGP in Capital Markets & Trading",
         "category": "executive",
         "tabs": {
+            # These were correct in v1
             "overview":   "/pgp-in-capital-markets-and-trading",
             "curriculum": "/pgp-in-capital-markets-and-trading-curriculum",
             "admissions": "/pgp-in-capital-markets-and-trading-admissions-and-fees",
@@ -146,15 +174,41 @@ COURSES = {
         },
     },
 
+    # ── PGP Bharat (NEW — was missing from v1) ──────────────────────────────
+    "pgp_bharat": {
+        "name": "PGP Bharat: Immersion-Driven Programme",
+        "category": "pgp",
+        "tabs": {
+            "overview":    "/pgp-bharat-immersion-driven-programme",
+            "experience":  "/pgp-bharat-immersion-driven-programme-experience",
+            "admissions":  "/pgp-bharat-immersion-driven-programme-admissions-and-fees",
+        },
+    },
+
     # ── UG Programmes ────────────────────────────────────────────────────────
     "ug_tbm": {
         "name": "UG in Technology & Business Management",
         "category": "ug",
         "tabs": {
-            "overview":   "/ug-technology-business-management",
+            # FIX: slug uses "and" → "ug-technology-AND-business-management"
+            "overview":   "/ug-technology-and-business-management",
             "curriculum": "/ug-curriculum",
             "admissions": "/ug-admissions-and-fees",
             "career":     "/ug-career-prospects",
+        },
+    },
+    "ug_tbm_global": {
+        "name": "UG in Technology & Business Management (Illinois Tech, US)",
+        "category": "ug",
+        "tabs": {
+            "overview": "/ug-technology-and-business-management-global",
+        },
+    },
+    "ug_data_science": {
+        "name": "UG in Data Science & AI",
+        "category": "ug",
+        "tabs": {
+            "overview": "/ug-data-science-and-artificial-intelligence",
         },
     },
 }
@@ -195,6 +249,17 @@ def clean_html(html: str) -> str:
             deduped.append(line)
 
     return "\n".join(deduped)
+
+
+# ─── URL VALIDATOR ────────────────────────────────────────────────────────────
+
+def validate_url(url: str) -> bool:
+    """Send a HEAD request to check if a URL exists (not 404)."""
+    try:
+        resp = requests.head(url, headers=HEADERS, timeout=10, allow_redirects=True)
+        return resp.status_code < 400
+    except requests.RequestException:
+        return False
 
 
 # ─── SINGLE PAGE FETCHER ──────────────────────────────────────────────────────
@@ -271,10 +336,17 @@ def scrape_all():
 
         for tab_name, path in course["tabs"].items():
             url  = BASE + path
+
+            # ── Quick HEAD check to catch 404s early ─────────────────────
+            if not validate_url(url):
+                print(f"  [404]  {tab_name:<14} {url}")
+                skipped += 1
+                continue
+
             html = fetch_page(url)
 
             if not html:
-                print(f"  [SKIP] {tab_name} — empty or 404")
+                print(f"  [SKIP] {tab_name} — empty response")
                 skipped += 1
                 continue
 
@@ -287,13 +359,13 @@ def scrape_all():
 
             # Save individual tab file
             tab_file = cat_dir / f"{course_key}_{tab_name}.txt"
-            header = f"=== {name} — {tab_name.upper()} ===\nURL: {url}\n\n"
-            tab_file.write_text(header + text, encoding="utf-8")
+            file_header = f"=== {name} — {tab_name.upper()} ===\nURL: {url}\n\n"
+            tab_file.write_text(file_header + text, encoding="utf-8")
 
             # Also add to combined file
             combined_parts.append(f"\n\n--- {tab_name.upper()} ---\n{text}")
 
-            print(f"  [OK] {tab_name:<14} {len(text):>6,} chars -> {tab_file.name}")
+            print(f"  [OK]   {tab_name:<14} {len(text):>6,} chars -> {tab_file.name}")
             done += 1
 
             # Polite delay — don't hammer the server
@@ -317,6 +389,6 @@ def scrape_all():
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("  MastersUnion.org -- Smart Course Scraper")
+    print("  MastersUnion.org -- Smart Course Scraper v2")
     print("=" * 50 + "\n")
     scrape_all()

@@ -30,7 +30,16 @@ st.caption("Hybrid RAG · Intent Routing · Hallucination Guardrails")
 def load_cached_pipeline():
     return load_pipeline()
 
-db, bm25, texts, chunks, embeddings, classifier, llm = load_cached_pipeline()
+_pipeline = load_cached_pipeline()
+db        = _pipeline.db
+bm25      = _pipeline.bm25
+texts     = _pipeline.texts
+chunks    = _pipeline.chunks
+embeddings = _pipeline.embeddings
+llm       = _pipeline.llm
+
+# Build metadata lookup once — avoids O(n²) scan per query
+chunk_metadata = {c.page_content: c.metadata for c in chunks}
 
 # ── Session State — initialize BEFORE any usage ───────────────────────────────
 if "messages" not in st.session_state:
@@ -145,6 +154,22 @@ def display_sources(high_sources, low_sources):
                     )
 
 
+# ── Input sanitization ────────────────────────────────────────────────────────
+MAX_QUERY_LENGTH = 500
+_INJECTION_PATTERNS = re.compile(
+    r"ignore (all |previous |prior )?instructions|you are now|system prompt|forget everything",
+    re.IGNORECASE,
+)
+
+def sanitize_query(query: str) -> str | None:
+    """Returns cleaned query, or None if the query should be rejected."""
+    if not isinstance(query, str):
+        return None
+    query = query.strip()[:MAX_QUERY_LENGTH]
+    if _INJECTION_PATTERNS.search(query):
+        return None
+    return query
+
 # ── Out-of-scope keywords ──────────────────────────────────────────────────────
 OUT_OF_SCOPE = [
     "cricket", "football", "movie", "stock price", "weather",
@@ -214,6 +239,12 @@ ANSWER:"""
 
 # ── Process Query ─────────────────────────────────────────────────────────────
 def process_query(query):
+    query = sanitize_query(query)
+    if not query:
+        with st.chat_message("assistant"):
+            st.warning("Your message couldn't be processed. Please rephrase and try again.")
+        return
+
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.write(query)
@@ -347,16 +378,15 @@ If a section has no data in context, skip it entirely. Do not invent anything.""
         high_sources = []
         low_sources = []
 
-        for doc in top_docs:
-            page_num = "?"
-            source_url = ""
-            for chunk in chunks:
-                if chunk.page_content == doc:
-                    page_num = chunk.metadata.get("page", "?")
-                    source_url = chunk.metadata.get("source", "")
-                    break
+        # Embed query once; reuse across all source docs
+        query_vec = embeddings.embed_query(query)
 
-            best_sentence, relevance = get_best_sentence(query, doc, embeddings)
+        for doc in top_docs:
+            metadata   = chunk_metadata.get(doc, {})
+            page_num   = metadata.get("page", "?")
+            source_url = metadata.get("source", "")
+
+            best_sentence, relevance = get_best_sentence(doc, embeddings, query_vec=query_vec)
             title = assign_title(doc, source_url)
 
             if any(kw in doc.lower() for kw in current_keywords):

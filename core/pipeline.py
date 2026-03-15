@@ -1,6 +1,9 @@
 import os
 import re
+import shutil
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -10,6 +13,16 @@ import pdfplumber
 import streamlit as st
 
 from utils.ocr_cleaner import clean_ocr
+
+
+@dataclass
+class Pipeline:
+    db: Any
+    bm25: Any
+    texts: list
+    chunks: list
+    embeddings: Any
+    llm: Any
 
 
 def clean_chunk_text(text: str) -> str:
@@ -113,6 +126,14 @@ def load_pipeline():
     )
     FAISS_INDEX_PATH = "./faiss_index"
 
+    # Rebuild index if program_data.txt is newer than the saved index
+    if os.path.exists(FAISS_INDEX_PATH):
+        index_mtime = os.path.getmtime(FAISS_INDEX_PATH)
+        data_mtime = os.path.getmtime("data/program_data.txt") if os.path.exists("data/program_data.txt") else 0
+        if data_mtime > index_mtime:
+            shutil.rmtree(FAISS_INDEX_PATH)
+            print("[FAISS] Source data newer than index — rebuilding")
+
     if os.path.exists(FAISS_INDEX_PATH):
         db = FAISS.load_local(
             FAISS_INDEX_PATH,
@@ -128,21 +149,19 @@ def load_pipeline():
     tokenized = [t.lower().split() for t in texts]
     bm25 = BM25Okapi(tokenized)
 
-    # Step 7: Lightweight intent classifier (no model download needed)
-    classifier = None
     print("[PIPELINE] Using fast keyword intent classifier")
 
-    # ── LLM toggle: set USE_LOCAL_LLM = True to use Ollama, False for Groq ──
-    USE_LOCAL_LLM = False
+    # ── LLM toggle: read from env/secrets, default False (Groq) ──────────────
+    USE_LOCAL_LLM = os.environ.get("USE_LOCAL_LLM", "false").lower() == "true"
 
     if USE_LOCAL_LLM:
         from langchain_ollama import ChatOllama
         llm = ChatOllama(
             model="qwen3:1.7b",
             temperature=0,
-            base_url="http://10.221.176.97:11434",
+            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
             num_ctx=4096,
-            num_predict=1500,  # Covers all answer types; Ollama stops at EOS naturally
+            num_predict=1500,
             num_thread=8,
             num_batch=512,
             repeat_penalty=1.1,
@@ -155,4 +174,4 @@ def load_pipeline():
             temperature=0,
         )
 
-    return db, bm25, texts, chunks, embeddings, classifier, llm
+    return Pipeline(db=db, bm25=bm25, texts=texts, chunks=chunks, embeddings=embeddings, llm=llm)
