@@ -79,5 +79,36 @@
     ],
     "answer_attempt": "⚠️ I couldn't verify this part. I don't have that detail. Please contact admissions at pgadmissions@mastersunion.org",
     "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 17:10",
+    "query": "hi",
+    "chat_history": [],
+    "answer_attempt": "Hello, how can I assist you with Masters' Union today?",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 17:10",
+    "query": "Hi",
+    "chat_history": [
+      {
+        "role": "Student",
+        "msg": "What is the program duration?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "- **Program Duration**: 15 months  \n- **Academic Terms**: 6 academic terms (each focusing on a specific stage of AI system development)  \n- **Learning Structure**: Combines in-class learning with out-class applied projects, with each term emphasizing a distinct phase of AI system development (e.g., data acquisition, model training, deployment, etc.)."
+      },
+      {
+        "role": "Student",
+        "msg": "What companies hire graduates?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "**Companies Hiring Graduates**:  \n- **Google**  \n- **Meta**  \n- **Apple**  \n- **Microsoft**  \n- **Samsung**  \n- **Amazon**  \n- **Paytm**  \n- **Accenture**  \n- **Flipkart**  \n- **Cisco**  \n- **ServiceNow**  \n- **Sprinklr**  \n- **Bain & Company**  \n- **Fractal**  \n- **Zepto**  \n- **Zomato**  \n- **Blinkit**  \n- **EY (Ernst & Young)**  \n- **Top companies in desired roles** (e.g., BCG, Zepto, EY, and startups in consulting, healthcare, and tech).  \n\nThese companies are highlighted in the brochure, website, and web search results as places where graduates secure roles in AI, data science, machine learning, and entrepreneurship."
+      }
+    ],
+    "answer_attempt": "**Companies Hiring Graduates**:  \n- **Google**  \n- **Meta**  \n- **Apple**  \n- **Microsoft**  \n- **Samsung**  \n- **Amazon**  \n- **Paytm**  \n- **Accenture**  \n- **Flipkart**  \n- **Cisco**  \n- **ServiceNow**  \n- **Sprinklr**  \n- **Bain & Company**  \n- **Fractal**  \n- **Zepto**  \n- **Zomato**  \n- **Blinkit**  \n- **EY (Ernst & Young)**  \n- **Top companies in desired roles** (e.g., BCG, Zepto, EY, and startups in consulting, healthcare, and tech).  \n\nThese companies are highlighted in the brochure, we",
+    "resolved": false
   }
 ]
