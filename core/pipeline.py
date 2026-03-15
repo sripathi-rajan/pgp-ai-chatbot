@@ -144,7 +144,7 @@ def load_pipeline():
         llm = ChatOllama(
             model="qwen3:1.7b",
             temperature=0,
-            base_url="http://127.0.0.1:11434",
+            base_url="http://10.221.176.97:11434",
             num_ctx=4096,
             num_predict=1500,  # Covers all answer types; Ollama stops at EOS naturally
             num_thread=8,
