@@ -1,5 +1,6 @@
 import os
 import re
+import threading
 import streamlit as st
 
 # Read API keys
@@ -62,6 +63,18 @@ def process_query(query):
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.write(query)
+
+    # ── Greeting shortcut — bypass RAG entirely ───────────────────────────────
+    GREETINGS = ["hi", "hello", "hey", "howdy", "good morning",
+                 "good evening", "good afternoon", "thanks", "thank you", "bye"]
+    if query.strip().lower().rstrip("!?.") in GREETINGS:
+        reply = "Hello! How can I help you with the PGP AI program today?"
+        with st.chat_message("assistant"):
+            st.markdown(reply)
+        st.session_state.chat_history.append(("Student", query))
+        st.session_state.chat_history.append(("Assistant", reply))
+        st.session_state.messages.append({"role": "assistant", "content": reply})
+        return
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
@@ -200,11 +213,15 @@ def process_query(query):
             "i don't have", "not found", "no information", "contact admissions",
             "please contact", "i couldn't find", "not sure", "don't know",
         ])
-        context_too_short = len(context.strip()) < 400
+        context_too_short = len(context.strip()) < 100
         low_relevance = not high_sources or all(r < 0.28 for _, _, _, r, _ in high_sources)
 
         if is_uncertain or context_too_short or low_relevance:
-            notify_admin(query, st.session_state.chat_history, answer)
+            threading.Thread(
+                target=notify_admin,
+                args=(query, list(st.session_state.chat_history), answer),
+                daemon=True
+            ).start()
             answer += (
                 "\n\n⚠️ This question isn't fully covered yet — "
                 "our team has been notified and will improve the knowledge base soon. Thank you!"
