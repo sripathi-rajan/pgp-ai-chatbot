@@ -151,8 +151,10 @@ def load_pipeline():
 
     print("[PIPELINE] Using fast keyword intent classifier")
 
-    # ── LLM toggle: read from env/secrets, default False (Groq) ──────────────
-    USE_LOCAL_LLM = os.environ.get("USE_LOCAL_LLM", "false").lower() == "true"
+    # ── LLM toggle: read from st.secrets first, fall back to env ─────────────
+    USE_LOCAL_LLM = (
+        st.secrets.get("USE_LOCAL_LLM", os.environ.get("USE_LOCAL_LLM", "false"))
+    ).lower() == "true"
 
     if USE_LOCAL_LLM:
         from langchain_ollama import ChatOllama
