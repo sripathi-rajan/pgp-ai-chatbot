@@ -13,7 +13,7 @@ os.environ["SERPER_API_KEY"] = serper_key or ""
 # Import our modules
 from core.pipeline import load_pipeline
 from core.retriever import hybrid_retrieve, get_best_sentence
-from core.intent import detect_intent
+from core.intent import detect_intent, NO_WARNING_INTENTS
 from core.web_search import web_search_fallback
 from core.prompt import build_prompt
 from utils.notifier import notify_admin
@@ -219,7 +219,7 @@ def process_query(query):
         context_too_short = len(context.strip()) < 100
         low_relevance = not high_sources or all(r < 0.28 for _, _, _, r, _ in high_sources)
 
-        if is_uncertain or context_too_short or low_relevance:
+        if (is_uncertain or context_too_short or low_relevance) and intent not in NO_WARNING_INTENTS:
             threading.Thread(
                 target=notify_admin,
                 args=(query, list(st.session_state.chat_history), answer),
