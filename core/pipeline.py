@@ -5,7 +5,6 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_groq import ChatGroq
 from rank_bm25 import BM25Okapi
 import pdfplumber
 import streamlit as st
@@ -137,6 +136,27 @@ def load_pipeline():
     classifier = None
     print("[PIPELINE] Using fast keyword intent classifier")
 
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+    # ── LLM toggle: set USE_LOCAL_LLM = True to use Ollama, False for Groq ──
+    USE_LOCAL_LLM = True
+
+    if USE_LOCAL_LLM:
+        from langchain_ollama import ChatOllama
+        llm = ChatOllama(
+            model="qwen3:1.7b",
+            temperature=0,
+            base_url="http://127.0.0.1:11434",
+            num_ctx=4096,
+            num_predict=1500,  # Covers all answer types; Ollama stops at EOS naturally
+            num_thread=8,
+            num_batch=512,
+            repeat_penalty=1.1,
+            stream=True,
+        )
+    else:
+        from langchain_groq import ChatGroq
+        llm = ChatGroq(
+            model="llama-3.3-70b-versatile",
+            temperature=0,
+        )
 
     return db, bm25, texts, chunks, embeddings, classifier, llm

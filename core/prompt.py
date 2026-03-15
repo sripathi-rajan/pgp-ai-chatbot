@@ -16,6 +16,7 @@ STRICT RULES:
 6. If truly not found anywhere, say: "I don't have that detail. Please contact admissions at pgadmissions@mastersunion.org"
 7. Never invent numbers, dates, or names.
 8. Be concise, use bullet points, format fees with ₹ symbol.
+9. For curriculum/syllabus questions: list ALL terms and modules completely — start from Term 1, do not skip or truncate.
 {history_text}
 CONTEXT (Brochure + Website + Web Search):
 {context}

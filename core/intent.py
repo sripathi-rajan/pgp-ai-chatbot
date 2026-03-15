@@ -1,33 +1,32 @@
-import streamlit as st
-from transformers import pipeline
+INTENT_KEYWORDS = {
+    "💰 Fees": [
+        "fee", "fees", "₹", "scholarship", "emi", "payment", "cost",
+        "installment", "price", "tuition", "discount", "waiver", "refund",
+    ],
+    "📚 Curriculum": [
+        "curriculum", "term", "module", "course", "syllabus", "subject",
+        "topic", "learn", "teach", "content", "semester", "week",
+    ],
+    "📋 Admissions": [
+        "admission", "eligibility", "apply", "application", "selection",
+        "interview", "criteria", "requirement", "qualify", "enroll", "join",
+        "deadline", "process",
+    ],
+    "🚀 Career": [
+        "career", "placement", "hire", "hires", "hiring", "salary", "company",
+        "job", "recruit", "employer", "package", "outcome", "opportunity",
+        "compan", "ctc",
+    ],
+    "🎓 Overview": [
+        "duration", "month", "schedule", "format", "online", "offline",
+        "program", "overview", "about", "structure", "hybrid", "pgp",
+    ],
+}
 
-# Initialize classifier (cached)
-@st.cache_resource
-def get_classifier():
-    return pipeline("zero-shot-classification", 
-                    model="facebook/bart-large-mnli", 
-                    device="cpu")  # Use "cuda" if GPU available
-
-classifier = get_classifier()
-candidate_labels = ["Fees", "Curriculum", "Admissions", "Career Outcomes", "Program Overview"]
-
-def detect_intent(query):
-    """
-    Zero-shot intent classification using BART-MNLI.
-    More accurate than keyword matching.
-    """
-    result = classifier(query, candidate_labels, multi_label=False)
-    intent_label = result["labels"][0]
-    confidence = result["scores"][0]
-    
-    # Map to emoji format
-    intent_map = {
-        "Fees": "💰 Fees",
-        "Curriculum": "📚 Curriculum", 
-        "Admissions": "📋 Admissions",
-        "Career Outcomes": "🚀 Career",
-        "Program Overview": "🎓 Overview"
-    }
-    
-    intent = intent_map.get(intent_label, "🎓 Overview")
-    return intent, confidence
+def detect_intent(text: str):
+    """Keyword-based intent classifier — zero RAM, instant."""
+    text_lower = text.lower()
+    for intent, keywords in INTENT_KEYWORDS.items():
+        if any(kw in text_lower for kw in keywords):
+            return intent, 0.85
+    return "🎓 Overview", 0.50

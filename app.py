@@ -1,4 +1,5 @@
 import os
+import re
 import streamlit as st
 
 # Read API keys
@@ -25,7 +26,11 @@ st.caption("Hybrid RAG · Intent Routing · Hallucination Guardrails")
 
 
 
-db, bm25, texts, chunks, embeddings, classifier, llm = load_pipeline()
+@st.cache_resource
+def load_cached_pipeline():
+    return load_pipeline()
+
+db, bm25, texts, chunks, embeddings, classifier, llm = load_cached_pipeline()
 
 # ── Session State — initialize BEFORE any usage ───────────────────────────────
 if "messages" not in st.session_state:
@@ -54,6 +59,7 @@ def assign_title(text, source=""):
 
 # ── Process Query ─────────────────────────────────────────────────────────────
 def process_query(query):
+    st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.write(query)
 
@@ -72,7 +78,14 @@ def process_query(query):
                 hint = clarification_map.get(intent, "the program")
                 st.info(f"Could you clarify — are you asking about **{hint}**? Feel free to rephrase.")
 
-            top_docs = hybrid_retrieve(query, db, bm25, texts, embeddings, k=5)
+            long_answer_triggers = [
+                "topics", "covered", "curriculum", "modules", "subjects", "terms", "syllabus",
+                "fee", "cost", "payment", "schedule", "installment", "scholarship",
+                "eligibility", "criteria", "process", "selection",
+                "companies", "career", "placement", "faculty", "who are", "what all",
+            ]
+            long_query = any(w in query.lower() for w in long_answer_triggers)
+            top_docs = hybrid_retrieve(query, db, bm25, texts, embeddings, k=3)
             context = "\n\n".join(top_docs)
 
             # Check if local context is thin — trigger web search
@@ -85,14 +98,12 @@ def process_query(query):
                 ["award", "news", "recent", "latest", "2024", "2025",
                  "reddit", "quora", "review", "ranking", "rank",
                  "batch", "intake", "size", "accreditat", "recogni"])
-            low_confidence = confidence < 0.60
-
-            # Always search web if any trigger fires
-            should_search = low_context or faculty_query or company_query or news_query or low_confidence
+            # Always search web if any trigger fires (low_confidence removed — pollutes local answers)
+            should_search = low_context or faculty_query or company_query or news_query
 
             print(f"[DEBUG] Query: {query}")
             print(f"[DEBUG] Triggers: low_context={low_context} faculty={faculty_query} "
-                  f"company={company_query} news={news_query} low_conf={low_confidence}")
+                  f"company={company_query} news={news_query}")
             print(f"[DEBUG] Will search web: {should_search}")
 
             web_context = ""
@@ -101,7 +112,7 @@ def process_query(query):
                     web_context = web_search_fallback(query)
                 print(f"[DEBUG] Web returned {len(web_context)} chars")
                 if web_context:
-                    context = context + "\n\nWEB SEARCH RESULTS:\n" + web_context
+                    context = context + "\n\nWEB SEARCH RESULTS:\n" + web_context[:1500]
                     print(f"[DEBUG] Preview: {web_context[:300]}")
                 else:
                     print("[DEBUG] Web search returned empty — no web context added")
@@ -110,24 +121,41 @@ def process_query(query):
 
             prompt = build_prompt(query, context, st.session_state.chat_history)
 
+            if long_query:
+                prompt += "\n\nIMPORTANT: Provide the COMPLETE answer. Do not truncate, abbreviate, or add '...' — write out every item in full."
+
             # Streaming response
             placeholder = st.empty()
             full_response = ""
-            for chunk in llm.stream(prompt):
-                full_response += chunk.content
-                placeholder.markdown(full_response + "▌")
+            try:
+                for chunk in llm.stream(prompt):
+                    # chunk.content is a str — avoid leaking repr of AIMessageChunk
+                    token = chunk.content if isinstance(chunk.content, str) else ""
+                    if token:
+                        full_response += token
+                        display = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL).strip()
+                        placeholder.markdown(display + "▌")
+            except Exception as e:
+                st.error(f"LLM stream error: {e}")
+                return
 
-        answer = full_response
+        # Final answer with think tags removed
+        answer = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL).strip()
 
-        # Hallucination Guardrail
-        guard_prompt = f"""Does the answer below contain any information not present in the CONTEXT?
-Answer only YES or NO.
+        if not answer:
+            st.error("No response received from the model.")
+            return
 
-CONTEXT: {context[:8000]}
-ANSWER: {answer}"""
-
-        guard_response = llm.invoke(guard_prompt)
-        if guard_response.content.strip().upper() == "YES":
+        # Hallucination Guardrail — phrase-based (no second LLM call)
+        HALLUCINATION_PHRASES = [
+            "as of my knowledge cutoff",
+            "i don't have access",
+            "i cannot confirm",
+            "not in my training",
+            "i made up",
+            "i fabricated",
+        ]
+        if any(p in answer.lower() for p in HALLUCINATION_PHRASES):
             answer = "⚠️ I couldn't verify this part. " + answer
 
         # ── Source relevance computation (needed for detection + display) ──────
@@ -258,7 +286,6 @@ with st.sidebar:
     ]
     for q in sample_questions:
         if st.button(q, use_container_width=True):
-            st.session_state.messages.append({"role": "user", "content": q})
             st.session_state["pending_query"] = q
             st.rerun()
 
@@ -270,7 +297,7 @@ with st.sidebar:
 
     st.divider()
     st.caption("🧠 Powered by")
-    st.caption("• Llama 3.3 70B (LLM)")
+    st.caption("• Qwen3 1.7B / Llama 3.3 70B (LLM)")
     st.caption("• Whisper (Voice)")
     st.caption("• MiniLM-L6 (Embeddings)")
     st.caption("• BM25 + RRF (Hybrid)")
@@ -449,5 +476,4 @@ components.html("""
 
 # ── Chat Input ────────────────────────────────────────────────────────────────
 if query := st.chat_input("Ask about the PGP AI program..."):
-    st.session_state.messages.append({"role": "user", "content": query})
     process_query(query)
