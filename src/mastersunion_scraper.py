@@ -139,11 +139,10 @@ COURSES = {
         "name": "PGP in Capital Markets & Trading",
         "category": "executive",
         "tabs": {
-            # These were correct in v1
             "overview":   "/pgp-in-capital-markets-and-trading",
             "curriculum": "/pgp-in-capital-markets-and-trading-curriculum",
             "admissions": "/pgp-in-capital-markets-and-trading-admissions-and-fees",
-            "career":     "/pgp-in-capital-markets-and-trading-career-prospects",
+            # career-prospects tab does not exist as a separate URL (404)
         },
     },
     "pgp_entrepreneurship": {
@@ -164,15 +163,7 @@ COURSES = {
             "admissions": "/pgp-rise-general-management-admissions-and-fees",
         },
     },
-    "pgp_opm": {
-        "name": "PGP Rise: Owners & Promoters Management",
-        "category": "family_business",
-        "tabs": {
-            "overview":   "/pgp-rise-owners-promoters-management",
-            "curriculum": "/pgp-rise-owners-promoters-management-curriculum",
-            "admissions": "/pgp-rise-owners-promoters-management-admissions-and-fees",
-        },
-    },
+    # pgp_opm removed — all URLs 404 on live site (programme may be discontinued)
 
     # ── PGP Bharat (NEW — was missing from v1) ──────────────────────────────
     "pgp_bharat": {
@@ -274,12 +265,12 @@ def fetch_page(url: str, retries: int = 2) -> str:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             page.set_extra_http_headers({"User-Agent": HEADERS["User-Agent"]})
-            page.goto(url, wait_until="networkidle", timeout=30000)
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
             try:
-                page.wait_for_selector("main, article, #__next, h1", timeout=5000)
+                page.wait_for_selector("main, article, #__next, h1", timeout=10000)
             except Exception:
                 pass
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(3000)
             html = page.content()
             browser.close()
 
