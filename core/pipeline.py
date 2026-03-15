@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from rank_bm25 import BM25Okapi
 import pdfplumber
@@ -123,11 +123,19 @@ def load_pipeline():
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
-    db = Chroma.from_documents(
-        chunks,
-        embeddings,
-        persist_directory="./chroma_db"
-    )
+    FAISS_INDEX_PATH = "./faiss_index"
+
+    if os.path.exists(FAISS_INDEX_PATH):
+        db = FAISS.load_local(
+            FAISS_INDEX_PATH,
+            embeddings,
+            allow_dangerous_deserialization=True
+        )
+        print("[FAISS] Loaded existing index")
+    else:
+        db = FAISS.from_documents(chunks, embeddings)
+        db.save_local(FAISS_INDEX_PATH)
+        print("[FAISS] Built and saved new index")
 
     tokenized = [t.lower().split() for t in texts]
     bm25 = BM25Okapi(tokenized)
@@ -137,7 +145,7 @@ def load_pipeline():
     print("[PIPELINE] Using fast keyword intent classifier")
 
     # ── LLM toggle: set USE_LOCAL_LLM = True to use Ollama, False for Groq ──
-    USE_LOCAL_LLM = True
+    USE_LOCAL_LLM = False
 
     if USE_LOCAL_LLM:
         from langchain_ollama import ChatOllama

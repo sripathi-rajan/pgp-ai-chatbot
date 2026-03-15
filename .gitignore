@@ -1,6 +1,8 @@
 .env
 chroma_db/
+faiss_index/
 __pycache__/
 *.pyc
 .DS_Store
+data/
 .streamlit/secrets.toml

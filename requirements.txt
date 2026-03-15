@@ -4,7 +4,8 @@ langchain-community
 langchain-huggingface
 langchain-groq
 langchain-text-splitters
-chromadb
+faiss-cpu
+# chromadb
 sentence-transformers
 rank-bm25
 scikit-learn
