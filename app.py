@@ -38,24 +38,57 @@ if "messages" not in st.session_state:
 
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-# ── Assign Title ──────────────────────────────────────────────────────────────
+# ── Assign Title — extract first meaningful line from content ──────────────────
 def assign_title(text, source=""):
-    t = text.lower()
     src = "🌐 Web" if "http" in str(source) else "📄 PDF"
-    if any(w in t for w in ['fee', '₹', 'scholarship', 'emi', 'payment', 'cost', 'installment']):
-        return f"{src} · 💰 Fee Structure"
-    elif any(w in t for w in ['curriculum', 'term', 'module', 'course', 'syllabus', 'subject']):
-        return f"{src} · 📚 Curriculum"
-    elif any(w in t for w in ['admission', 'eligibility', 'apply', 'selection', 'interview']):
-        return f"{src} · 📋 Admissions"
-    elif any(w in t for w in ['career', 'placement', 'hire', 'salary', 'company', 'job']):
-        return f"{src} · 🚀 Career Outcomes"
-    elif any(w in t for w in ['faculty', 'professor', 'mentor', 'instructor']):
-        return f"{src} · 👨‍🏫 Faculty"
-    elif any(w in t for w in ['duration', 'month', 'schedule', 'format', 'online', 'offline']):
-        return f"{src} · 🗓️ Program Structure"
-    else:
-        return f"{src} · 📄 Program Information"
+    for line in text.split("\n"):
+        line = line.strip()
+        if 10 < len(line) < 80:
+            return f"{src} · {line[:60]}"
+    return f"{src} · Program Information"
+
+# ── Small talk detector ────────────────────────────────────────────────────────
+SMALL_TALK = [
+    "hi", "hello", "hey", "howdy", "hiya",
+    "good morning", "good evening", "good afternoon", "good night",
+    "thanks", "thank you", "thx", "ty",
+    "bye", "goodbye", "see you", "take care",
+    "ok", "okay", "cool", "got it", "sure", "great",
+    "who are you", "what are you", "what can you do",
+]
+
+def is_small_talk(query: str) -> str | None:
+    """Returns a canned reply if small talk, else None."""
+    q = query.strip().lower().rstrip("!?.")
+    if q not in SMALL_TALK:
+        return None
+    if any(w in q for w in ["hi", "hello", "hey", "howdy", "hiya", "morning", "evening", "afternoon", "night"]):
+        return "Hello! How can I help you with the PGP AI program today?"
+    if any(w in q for w in ["thanks", "thank", "thx", "ty"]):
+        return "You're welcome! Feel free to ask anything else."
+    if any(w in q for w in ["bye", "goodbye", "see you", "take care"]):
+        return "Goodbye! Come back anytime if you have more questions."
+    if any(w in q for w in ["who are you", "what are you", "what can you do"]):
+        return "I'm the PGP AI Program Assistant. Ask me about fees, curriculum, admissions, career outcomes, or anything else about the program!"
+    return "Got it! Feel free to ask me anything about the PGP AI program."
+
+# ── Detect whether query expects a list or exhaustive answer ───────────────────
+def needs_complete_answer(query: str) -> bool:
+    q = query.lower()
+    list_starters = ["what all", "what are all", "list", "enumerate", "give me all",
+                     "tell me all", "show all", "what topics", "what subjects",
+                     "all the", "every", "complete", "full", "entire", "detailed"]
+    list_subjects = ["topics", "covered", "curriculum", "modules", "subjects", "terms",
+                     "syllabus", "fees", "schedule", "installments", "criteria",
+                     "requirements", "companies", "recruiters", "faculty", "professors",
+                     "mentors", "features", "benefits", "outcomes", "placements"]
+    return any(w in q for w in list_starters) or any(w in q for w in list_subjects)
+
+# ── Out-of-scope keywords ──────────────────────────────────────────────────────
+OUT_OF_SCOPE = [
+    "cricket", "football", "movie", "stock price", "weather",
+    "recipe", "joke", "poem", "write an essay",
+]
 
 # ── Process Query ─────────────────────────────────────────────────────────────
 def process_query(query):
@@ -63,23 +96,26 @@ def process_query(query):
     with st.chat_message("user"):
         st.write(query)
 
-    # ── Detect intent first so conversational shortcut can use it ────────────
-    intent, confidence = detect_intent(query)
+    # ── Small talk shortcut — bypass RAG entirely ─────────────────────────────
+    small_talk_reply = is_small_talk(query)
+    if small_talk_reply:
+        with st.chat_message("assistant"):
+            st.markdown(small_talk_reply)
+        st.session_state.chat_history.append(("Student", query))
+        st.session_state.chat_history.append(("Assistant", small_talk_reply))
+        st.session_state.messages.append({"role": "assistant", "content": small_talk_reply})
+        return
 
-    # ── Conversational shortcut — bypass RAG entirely ─────────────────────────
-    CONVERSATIONAL_RESPONSES = {
-        "👋 Greeting": "Hello! How can I help you with the PGP AI program today?",
-        "🙏 Thanks":   "You're welcome! Happy to help. Feel free to ask anything else about the PGP AI program.",
-        "👋 Farewell": "Goodbye! Feel free to come back if you have more questions about the program.",
-    }
-    if intent in CONVERSATIONAL_RESPONSES:
-        reply = CONVERSATIONAL_RESPONSES[intent]
+    # ── Out-of-scope redirect ─────────────────────────────────────────────────
+    if any(w in query.lower() for w in OUT_OF_SCOPE):
+        reply = "I'm specialised in answering questions about the PGP AI program. Could you ask me something related to the program?"
         with st.chat_message("assistant"):
             st.markdown(reply)
-        st.session_state.chat_history.append(("Student", query))
-        st.session_state.chat_history.append(("Assistant", reply))
         st.session_state.messages.append({"role": "assistant", "content": reply})
         return
+
+    # ── RAG pipeline ──────────────────────────────────────────────────────────
+    intent, confidence = detect_intent(query)
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
@@ -95,19 +131,12 @@ def process_query(query):
                 hint = clarification_map.get(intent, "the program")
                 st.info(f"Could you clarify — are you asking about **{hint}**? Feel free to rephrase.")
 
-            long_answer_triggers = [
-                "topics", "covered", "curriculum", "modules", "subjects", "terms", "syllabus",
-                "fee", "cost", "payment", "schedule", "installment", "scholarship",
-                "eligibility", "criteria", "process", "selection",
-                "companies", "career", "placement", "faculty", "who are", "what all",
-            ]
-            long_query = any(w in query.lower() for w in long_answer_triggers)
             top_docs = hybrid_retrieve(query, db, bm25, texts, embeddings, k=3)
             context = "\n\n".join(top_docs)
 
             prompt = build_prompt(query, context, st.session_state.chat_history)
 
-            if long_query:
+            if needs_complete_answer(query):
                 prompt += "\n\nIMPORTANT: Provide the COMPLETE answer. Do not truncate, abbreviate, or add '...' — write out every item in full."
 
             # Streaming response
