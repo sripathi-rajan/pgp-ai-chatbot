@@ -1,30 +1,12 @@
 import os
 import streamlit as st
 
-# Read API key
+# Read API keys
 groq_key = st.secrets.get("GROQ_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
 os.environ["GROQ_API_KEY"] = groq_key
 
 serper_key = st.secrets.get("SERPER_API_KEY") or os.environ.get("SERPER_API_KEY")
 os.environ["SERPER_API_KEY"] = serper_key or ""
-
-
-import re
-import numpy as np
-import requests
-from bs4 import BeautifulSoup
-from sklearn.metrics.pairwise import cosine_similarity
-from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_groq import ChatGroq
-from rank_bm25 import BM25Okapi
-
-try:
-    from duckduckgo_search import DDGS
-except ImportError:
-    DDGS = None
 
 # Import our modules
 from core.pipeline import load_pipeline
@@ -32,8 +14,9 @@ from core.retriever import hybrid_retrieve, get_best_sentence
 from core.intent import detect_intent
 from core.web_search import web_search_fallback
 from core.prompt import build_prompt
-from utils.ocr_cleaner import clean_ocr
 from utils.notifier import notify_admin
+
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="PGP AI Assistant", page_icon="🎓")
 st.title("🎓 PGP AI Program Assistant")
@@ -202,16 +185,13 @@ ANSWER: {answer}"""
         placeholder.markdown(answer)
 
         # Feedback buttons
-        col_feedback = st.columns(3)
+        col_feedback = st.columns(2)
         with col_feedback[0]:
             if st.button("👍 Helpful", key=f"helpful_{len(st.session_state.messages)}"):
                 st.success("Thanks for the feedback!")
         with col_feedback[1]:
             if st.button("👎 Not helpful", key=f"not_helpful_{len(st.session_state.messages)}"):
                 st.error("Sorry about that. We'll improve!")
-        with col_feedback[2]:
-            if st.button("🎤 Voice Input", key=f"voice_{len(st.session_state.messages)}"):
-                st.info("Voice input feature coming soon!")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -291,9 +271,8 @@ with st.sidebar:
     st.divider()
     st.caption("🧠 Powered by")
     st.caption("• Llama 3.3 70B (LLM)")
+    st.caption("• Whisper (Voice)")
     st.caption("• MiniLM-L6 (Embeddings)")
-    st.caption("• BART-MNLI (Intent)")
-    st.caption("• BGE Reranker (Relevance)")
     st.caption("• BM25 + RRF (Hybrid)")
     st.caption("• pdfplumber (PDF)")
     st.caption("• BeautifulSoup (Web)")
@@ -309,6 +288,164 @@ for msg in st.session_state.messages:
 if "pending_query" in st.session_state:
     q = st.session_state.pop("pending_query")
     process_query(q)
+
+# ── Chat bar styling + inline voice button injection ──────────────────────────
+components.html("""
+<script>
+(function() {
+  const pdoc = window.parent.document;
+  if (pdoc.getElementById('pgp-voice-btn')) return;
+
+  // ── Chat bar CSS: single flex row, no extra wrappers breaking alignment ─────
+  const style = pdoc.createElement('style');
+  style.textContent = `
+    /* Outer container → flex row */
+    [data-testid="stChatInput"] > div {
+      display: flex !important;
+      align-items: center !important;
+      width: 100% !important;
+      padding: 8px 12px !important;
+      border-radius: 12px !important;
+      gap: 8px !important;
+      box-sizing: border-box !important;
+    }
+
+    /* Textarea: flex: 1 to fill available width */
+    [data-testid="stChatInputTextArea"] {
+      flex: 1 !important;
+      border: none !important;
+      outline: none !important;
+      background: transparent !important;
+      font-size: 14px !important;
+      resize: none !important;
+      min-height: 36px !important;
+      max-height: 36px !important;
+      padding: 0 !important;
+      line-height: 36px !important;
+      overflow: hidden !important;
+      align-self: center !important;
+    }
+
+    /* Actions wrapper: flex row, zero extra spacing */
+    [data-testid="stChatInput"] > div > div:last-child {
+      display: flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      flex-shrink: 0 !important;
+    }
+
+    /* Send button */
+    [data-testid="stChatInputSubmitButton"] button {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 36px !important;
+      height: 36px !important;
+      border-radius: 8px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      flex-shrink: 0 !important;
+    }
+    [data-testid="stChatInputSubmitButton"] button:hover {
+      background: rgba(255,255,255,0.08) !important;
+    }
+
+    /* Mic button: same size/style as send button */
+    #pgp-voice-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      color: #888;
+      flex-shrink: 0;
+      transition: background .2s, color .2s;
+    }
+    #pgp-voice-btn:hover  { background: rgba(255,255,255,0.08); color: #fff; }
+    #pgp-voice-btn.active { color: #ff4b4b; background: #ff4b4b22; animation: pgp-pulse 1s infinite; }
+    @keyframes pgp-pulse  { 0%,100%{opacity:1} 50%{opacity:.4} }
+  `;
+  pdoc.head.appendChild(style);
+
+  // ── Mic button ──────────────────────────────────────────────────────────────
+  const MIC_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v6a2 2 0 0 0 4 0V5a2 2 0 0 0-2-2zM4.5 12h2A5.5 5.5 0 0 0 12 17.5 5.5 5.5 0 0 0 17.5 12h2A7.5 7.5 0 0 1 13 19.43V22h-2v-2.57A7.5 7.5 0 0 1 4.5 12z"/>
+  </svg>`;
+  const STOP_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="5" y="5" width="14" height="14" rx="2"/>
+  </svg>`;
+
+  const btn = pdoc.createElement('button');
+  btn.id = 'pgp-voice-btn';
+  btn.title = 'Voice input (Chrome/Edge)';
+  btn.innerHTML = MIC_SVG;
+
+  // ── Insert mic inline, before the send button ───────────────────────────────
+  function insertMicBtn() {
+    const submitWrapper = pdoc.querySelector('[data-testid="stChatInputSubmitButton"]');
+    if (submitWrapper && !pdoc.getElementById('pgp-voice-btn')) {
+      submitWrapper.parentNode.insertBefore(btn, submitWrapper);
+      return true;
+    }
+    return false;
+  }
+
+  if (!insertMicBtn()) {
+    const observer = new MutationObserver(() => {
+      if (insertMicBtn()) observer.disconnect();
+    });
+    observer.observe(pdoc.body, { childList: true, subtree: true });
+  }
+
+  // ── Speech recognition ──────────────────────────────────────────────────────
+  const SR = window.parent.SpeechRecognition || window.parent.webkitSpeechRecognition;
+  let rec = null, active = false;
+
+  btn.addEventListener('click', () => {
+    if (!SR) { alert('Voice input requires Chrome or Edge.'); return; }
+    if (active) { rec.stop(); return; }
+
+    rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+
+    rec.onstart = () => {
+      active = true;
+      btn.classList.add('active');
+      btn.innerHTML = STOP_SVG;
+    };
+
+    rec.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      const ta = pdoc.querySelector('[data-testid="stChatInputTextArea"]');
+      if (ta) {
+        const setter = Object.getOwnPropertyDescriptor(
+          window.parent.HTMLTextAreaElement.prototype, 'value'
+        ).set;
+        setter.call(ta, text);
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.focus();
+      }
+    };
+
+    rec.onend = () => {
+      active = false;
+      btn.classList.remove('active');
+      btn.innerHTML = MIC_SVG;
+    };
+
+    rec.onerror = (e) => { console.error('Voice error:', e.error); rec.stop(); };
+    rec.start();
+  });
+})();
+</script>
+""", height=0)
 
 # ── Chat Input ────────────────────────────────────────────────────────────────
 if query := st.chat_input("Ask about the PGP AI program..."):
