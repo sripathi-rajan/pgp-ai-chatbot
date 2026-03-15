@@ -10,10 +10,15 @@ Usage:
 """
 
 import re
+import sys
 import time
 import requests
 from pathlib import Path
 from bs4 import BeautifulSoup
+
+# Force UTF-8 output on Windows consoles
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 RAW_DIR = Path("data/raw")
 RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -165,12 +170,21 @@ def clean_html(html: str) -> str:
                      "button", "meta", "link"]):
         tag.decompose()
 
-    # Get text
-    text = soup.get_text(separator="\n")
+    # Target main content area — Next.js sites put everything under #__next
+    content = (
+        soup.find("main") or
+        soup.find("article") or
+        soup.find(id="__next") or
+        soup.find(class_="content") or
+        soup.find(class_="container") or
+        soup
+    )
+
+    text = content.get_text(separator="\n")
 
     # Clean up whitespace
     lines = [line.strip() for line in text.splitlines()]
-    lines = [l for l in lines if l and len(l) > 2]
+    lines = [l for l in lines if l and len(l) > 10]
 
     # Remove duplicate lines (nav items repeat across pages)
     seen = set()
@@ -186,18 +200,50 @@ def clean_html(html: str) -> str:
 # ─── SINGLE PAGE FETCHER ──────────────────────────────────────────────────────
 
 def fetch_page(url: str, retries: int = 2) -> str:
+    """Try Playwright first (JS rendering), fall back to requests."""
+
+    # ── Method 1: Playwright (handles JS-rendered Next.js sites) ─────────
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.set_extra_http_headers({"User-Agent": HEADERS["User-Agent"]})
+            page.goto(url, wait_until="networkidle", timeout=30000)
+            try:
+                page.wait_for_selector("main, article, #__next, h1", timeout=5000)
+            except Exception:
+                pass
+            page.wait_for_timeout(2000)
+            html = page.content()
+            browser.close()
+
+            # Validate we got real content, not an empty shell
+            soup = BeautifulSoup(html, "html.parser")
+            if len(soup.get_text(strip=True)) > 200:
+                return html
+            print(f"    [THIN-JS] {url} — Playwright got thin content")
+            return ""
+
+    except ImportError:
+        print("  [WARN] Playwright not installed, falling back to requests")
+        print("  Run: pip install playwright && playwright install chromium")
+    except Exception as e:
+        print(f"    [PLAYWRIGHT-FAIL] {url} -> {e}")
+
+    # ── Method 2: requests fallback ───────────────────────────────────────
     for attempt in range(retries + 1):
         try:
-            # Use Playwright for better JS rendering
-            html = scrape_with_playwright(url)
-            if not html:
-                raise Exception("Playwright returned empty")
-            return html
-        except Exception as e:
+            resp = requests.get(url, headers=HEADERS, timeout=20)
+            if resp.status_code == 404:
+                return ""
+            resp.raise_for_status()
+            return resp.text
+        except requests.RequestException as e:
             if attempt < retries:
                 time.sleep(2)
             else:
-                print(f"    [FAIL] {url} → {e}")
+                print(f"    [FAIL] {url} -> {e}")
                 return ""
     return ""
 
@@ -219,7 +265,7 @@ def scrape_all():
         cat_dir = RAW_DIR / category
         cat_dir.mkdir(exist_ok=True)
 
-        print(f"── {name} ({category})")
+        print(f"-- {name} ({category})")
 
         combined_parts = [f"COURSE: {name}\nCATEGORY: {category}\n"]
 
@@ -247,7 +293,7 @@ def scrape_all():
             # Also add to combined file
             combined_parts.append(f"\n\n--- {tab_name.upper()} ---\n{text}")
 
-            print(f"  [OK] {tab_name:<14} {len(text):>6,} chars → {tab_file.name}")
+            print(f"  [OK] {tab_name:<14} {len(text):>6,} chars -> {tab_file.name}")
             done += 1
 
             # Polite delay — don't hammer the server
@@ -256,46 +302,21 @@ def scrape_all():
         # Save combined file per course (best for RAG — all context together)
         combined_file = RAW_DIR / f"{course_key}_full.txt"
         combined_file.write_text("\n".join(combined_parts), encoding="utf-8")
-        print(f"  [COMBINED] → {combined_file.name}\n")
+        print(f"  [COMBINED] -> {combined_file.name}\n")
 
     # ── Summary ──────────────────────────────────────────────────────────────
     files = list(RAW_DIR.glob("**/*.txt"))
     total_chars = sum(f.stat().st_size for f in files)
 
-    print("═" * 50)
+    print("=" * 50)
     print(f"  Done! {done} pages scraped, {skipped} skipped")
     print(f"  {len(files)} text files, {total_chars:,} total chars")
     print(f"  Output: {RAW_DIR}/")
-    print()
-    print("  If many tabs show [THIN], the site uses JS rendering.")
-    print("  Run: python src/playwright_fallback.py  (see below)")
-    print("═" * 50)
-
-
-# ─── PLAYWRIGHT FALLBACK ─────────────────────────────────────────────────────
-# Only needed if BeautifulSoup returns thin/empty content
-# Install: pip install playwright && playwright install chromium
-
-def scrape_with_playwright(url: str) -> str:
-    """Use this as fallback if requests returns JS-rendered empty pages."""
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page    = browser.new_page()
-            page.set_extra_http_headers({"User-Agent": HEADERS["User-Agent"]})
-            page.goto(url, wait_until="networkidle", timeout=30000)
-            page.wait_for_timeout(2000)   # wait for JS to render
-            html = page.content()
-            browser.close()
-            return html
-    except ImportError:
-        print("  Playwright not installed. Run: pip install playwright && playwright install chromium")
-        return ""
+    print("=" * 50)
 
 
 if __name__ == "__main__":
-    print("═" * 50)
-    print("  MastersUnion.org — Smart Course Scraper")
-    print("═" * 50 + "\n")
+    print("=" * 50)
+    print("  MastersUnion.org -- Smart Course Scraper")
+    print("=" * 50 + "\n")
     scrape_all()

@@ -178,5 +178,60 @@
     ],
     "answer_attempt": "It seems like you're looking for some good answers. However, I'd like to clarify what you're referring to. Are you looking for answers related to the PGP AI program, such as the curriculum, faculty, or companies that hire graduates? If so, I'd be happy to help. \n\nIf you're looking for answers related to the student entrepreneurs or startups mentioned, I can provide some information on that as well. For example, some of the startups include:\n* Memotag\n* The Good Browser\n* AIOS\n* SEMS\n* Bhupesh Ch",
     "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 23:02",
+    "query": "Tell me everything about course",
+    "chat_history": [],
+    "answer_attempt": "The provided context does not contain detailed information about a specific course. However, it mentions the following aspects of a programme:\n\n* System-Level Understanding: \n  * Data acquisition and processing\n  * Model training and evaluation\n  * Deployment and monitoring\n  * Automation and workflow integration\n* Real-World Problem Solving: The programme focuses on solving real business problems using AI technologies.\n* Programme Location and Delivery Modes: The programme is delivered from the",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 23:22",
+    "query": "Compare PGP AI with PGP Technology & Business Management",
+    "chat_history": [
+      {
+        "role": "Student",
+        "msg": "Is it good?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org"
+      },
+      {
+        "role": "Student",
+        "msg": "What next after this?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org"
+      }
+    ],
+    "answer_attempt": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 23:22",
+    "query": "I have 3 years of work experience. Should I join?",
+    "chat_history": [
+      {
+        "role": "Student",
+        "msg": "What next after this?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org"
+      },
+      {
+        "role": "Student",
+        "msg": "Compare PGP AI with PGP Technology & Business Management"
+      },
+      {
+        "role": "Assistant",
+        "msg": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org\n\n⚠️ This question isn't fully covered yet — our team has been notified and will improve the knowledge base soon. Thank you!"
+      }
+    ],
+    "answer_attempt": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org",
+    "resolved": false
   }
 ]

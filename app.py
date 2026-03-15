@@ -12,7 +12,7 @@ os.environ["SERPER_API_KEY"] = serper_key or ""
 
 # Import our modules
 from core.pipeline import load_pipeline
-from core.retriever import hybrid_retrieve, get_best_sentence
+from core.retriever import hybrid_retrieve, broad_retrieve, get_best_sentence
 from core.intent import detect_intent, NO_WARNING_INTENTS
 from core.prompt import build_prompt
 from utils.notifier import notify_admin
@@ -72,17 +72,78 @@ def is_small_talk(query: str) -> str | None:
         return "I'm the PGP AI Program Assistant. Ask me about fees, curriculum, admissions, career outcomes, or anything else about the program!"
     return "Got it! Feel free to ask me anything about the PGP AI program."
 
-# ── Detect whether query expects a list or exhaustive answer ───────────────────
-def needs_complete_answer(query: str) -> bool:
-    q = query.lower()
-    list_starters = ["what all", "what are all", "list", "enumerate", "give me all",
-                     "tell me all", "show all", "what topics", "what subjects",
-                     "all the", "every", "complete", "full", "entire", "detailed"]
-    list_subjects = ["topics", "covered", "curriculum", "modules", "subjects", "terms",
-                     "syllabus", "fees", "schedule", "installments", "criteria",
-                     "requirements", "companies", "recruiters", "faculty", "professors",
-                     "mentors", "features", "benefits", "outcomes", "placements"]
-    return any(w in q for w in list_starters) or any(w in q for w in list_subjects)
+# ── Source display ────────────────────────────────────────────────────────────
+def display_sources(high_sources, low_sources):
+    """Render high-relevance and low-relevance sources in clean, clickable expanders."""
+    if not high_sources and not low_sources:
+        return
+
+    with st.expander("📄 Sources used to answer"):
+        for page_num, title, sentence, full_chunk, relevance, source_url in high_sources:
+            has_url = "http" in str(source_url)
+            filename = str(source_url).split("/")[-1].split("\\")[-1] if source_url else "Document"
+            score_pct = f"{relevance:.0%}"
+            badge = f"🟢 {score_pct}" if relevance > 0.5 else f"🟡 {score_pct}"
+            page_display = f"Page {page_num}" if str(page_num) != "?" else "PDF"
+
+            if has_url:
+                # Web/scraped source — full clickable card
+                color = "#1D9E75" if relevance > 0.5 else "#3B8BD4"
+                preview = " ".join(sentence.split())[:120]
+                st.markdown(f"""
+                <a href="{source_url}" target="_blank" style="text-decoration:none;">
+                <div style="border:0.5px solid #e0e0e0;border-left:4px solid {color};
+                            border-radius:8px;padding:14px 16px;margin-bottom:10px;cursor:pointer;"
+                     onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
+                     onmouseout="this.style.boxShadow='none'">
+                    <div style="display:flex;justify-content:space-between;
+                                align-items:center;margin-bottom:8px;">
+                        <span style="font-size:13px;font-weight:600;color:{color};">{title}</span>
+                        <span style="font-size:11px;color:{color};background:{color}18;
+                                     padding:2px 8px;border-radius:10px;">
+                            {badge} · 🔗 View source
+                        </span>
+                    </div>
+                    <div style="font-size:11px;color:#999;margin-bottom:6px;">🌐 {source_url}</div>
+                    <div style="font-size:13px;line-height:1.7;color:#333;">{preview}{"..." if len(sentence) > 120 else ""}</div>
+                </div>
+                </a>
+                """, unsafe_allow_html=True)
+            else:
+                # PDF/doc source — expandable with full chunk as proof
+                label = f"📎 {filename}  |  {page_display}  {badge}"
+                with st.expander(label, expanded=False):
+                    st.markdown(f"**📄 File:** `{filename}`")
+                    st.markdown(f"**📖 Page:** `{page_display}`")
+                    st.markdown(f"**🎯 Relevance:** `{score_pct}`")
+                    st.divider()
+                    st.markdown("**📝 Excerpt:**")
+                    preview = " ".join(full_chunk.split())[:120]
+                    st.info(preview + ("..." if len(full_chunk) > 120 else ""))
+
+        if low_sources:
+            st.markdown(
+                "<div style='font-size:12px;color:#999;margin-top:8px;"
+                "margin-bottom:4px;'>📎 Additional References</div>",
+                unsafe_allow_html=True
+            )
+            for page_num, title, source_url in low_sources:
+                has_url = "http" in str(source_url)
+                if has_url:
+                    st.markdown(
+                        f"<div style='font-size:12px;color:#888;padding:4px 0;'>"
+                        f"· <a href='{source_url}' target='_blank' style='color:#3B8BD4;'>"
+                        f"{title}</a> — {source_url}</div>",
+                        unsafe_allow_html=True
+                    )
+                else:
+                    page_display = f"Page {page_num}" if str(page_num) != "?" else "PDF"
+                    st.markdown(
+                        f"<div style='font-size:12px;color:#888;padding:4px 0;'>"
+                        f"· {title} — {page_display}</div>",
+                        unsafe_allow_html=True
+                    )
+
 
 # ── Out-of-scope keywords ──────────────────────────────────────────────────────
 OUT_OF_SCOPE = [
@@ -115,7 +176,7 @@ def process_query(query):
         return
 
     # ── RAG pipeline ──────────────────────────────────────────────────────────
-    intent, confidence = detect_intent(query)
+    intent, confidence = detect_intent(query, llm=llm)
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
@@ -131,13 +192,37 @@ def process_query(query):
                 hint = clarification_map.get(intent, "the program")
                 st.info(f"Could you clarify — are you asking about **{hint}**? Feel free to rephrase.")
 
-            top_docs = hybrid_retrieve(query, db, bm25, texts, embeddings, k=3)
+            BROAD_QUERY_TRIGGERS = [
+                "tell me everything", "tell me about", "explain the course",
+                "explain the program", "overview", "summarize", "all about",
+                "what is this program", "describe the program", "give me details",
+                "what does this program offer", "full details", "complete information",
+            ]
+            is_broad = any(w in query.lower() for w in BROAD_QUERY_TRIGGERS)
+
+            if is_broad:
+                top_docs = broad_retrieve(query, db, bm25, texts, embeddings, chunks_per_topic=2)
+            else:
+                top_docs = hybrid_retrieve(query, db, bm25, texts, embeddings, k=3)
             context = "\n\n".join(top_docs)
 
-            prompt = build_prompt(query, context, st.session_state.chat_history)
+            prompt = build_prompt(query, context, st.session_state.chat_history, intent=intent)
 
-            if needs_complete_answer(query):
-                prompt += "\n\nIMPORTANT: Provide the COMPLETE answer. Do not truncate, abbreviate, or add '...' — write out every item in full."
+            if is_broad:
+                prompt += """
+
+IMPORTANT: The user wants a complete overview. Structure your answer with these sections \
+(only include sections that have information in the context):
+
+## Program Overview
+## Curriculum & Topics
+## Fees & Scholarships
+## Eligibility & Admissions
+## Career Outcomes
+## Learning Format
+
+Keep each section concise — 3 to 5 bullet points. \
+If a section has no data in context, skip it entirely. Do not invent anything."""
 
             # Streaming response
             placeholder = st.empty()
@@ -204,11 +289,11 @@ def process_query(query):
                 relevance = min(relevance + 0.2, 1.0)
 
             if relevance >= 0.30:
-                high_sources.append((page_num, title, best_sentence, relevance, source_url))
+                high_sources.append((page_num, title, best_sentence, doc, relevance, source_url))
             else:
                 low_sources.append((page_num, title, source_url))
 
-        high_sources.sort(key=lambda x: x[3], reverse=True)
+        high_sources.sort(key=lambda x: x[4], reverse=True)
 
         # ── Low-confidence detection & admin notification ─────────────────────
         is_uncertain = any(phrase in answer.lower() for phrase in [
@@ -216,7 +301,7 @@ def process_query(query):
             "please contact", "i couldn't find", "not sure", "don't know",
         ])
         context_too_short = len(context.strip()) < 100
-        low_relevance = not high_sources or all(r < 0.28 for _, _, _, r, _ in high_sources)
+        low_relevance = not high_sources or all(r < 0.28 for _, _, _, _, r, _ in high_sources)
 
         if (is_uncertain or context_too_short or low_relevance) and intent not in NO_WARNING_INTENTS:
             threading.Thread(
@@ -246,40 +331,7 @@ def process_query(query):
         with col2:
             st.info(f"Confidence: {confidence:.0%}")
 
-        with st.expander("📄 Sources used to answer"):
-            for page_num, title, sentence, relevance, source_url in high_sources:
-                color = "#1D9E75" if relevance > 0.5 else "#3B8BD4"
-                badge = "✅ High" if relevance > 0.5 else "🔵 Medium"
-                source_label = f"🌐 {source_url}" if "http" in str(source_url) else f"📄 Page {page_num}"
-                st.markdown(f"""
-                <div style="border:0.5px solid #e0e0e0;border-left:4px solid {color};
-                            border-radius:8px;padding:14px 16px;margin-bottom:10px;">
-                    <div style="display:flex;justify-content:space-between;
-                                align-items:center;margin-bottom:8px;">
-                        <span style="font-size:13px;font-weight:600;color:{color};">{title}</span>
-                        <span style="font-size:11px;color:{color};background:{color}18;
-                                     padding:2px 8px;border-radius:10px;">
-                            {badge} · {relevance:.0%}
-                        </span>
-                    </div>
-                    <div style="font-size:11px;color:#999;margin-bottom:6px;">{source_label}</div>
-                    <div style="font-size:13px;line-height:1.7;color:#333;">{sentence}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            if low_sources:
-                st.markdown(
-                    "<div style='font-size:12px;color:#999;margin-top:8px;"
-                    "margin-bottom:4px;'>📎 Additional References</div>",
-                    unsafe_allow_html=True
-                )
-                for page_num, title, source_url in low_sources:
-                    ref = source_url if "http" in str(source_url) else f"Page {page_num}"
-                    st.markdown(
-                        f"<div style='font-size:12px;color:#888;padding:4px 0;'>"
-                        f"· {title} — {ref}</div>",
-                        unsafe_allow_html=True
-                    )
+        display_sources(high_sources, low_sources)
 
     # Save to simple chat history — no external dependency
     st.session_state.chat_history.append(("Student", query))

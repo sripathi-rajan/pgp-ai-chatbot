@@ -17,6 +17,33 @@ def hybrid_retrieve(query, db, bm25, texts, embeddings, k=5):
     sorted_docs = sorted(rrf_scores, key=rrf_scores.__getitem__, reverse=True)
     return sorted_docs[:k]
 
+def broad_retrieve(query, db, bm25, texts, embeddings, chunks_per_topic=2):
+    """
+    For broad/overview queries — fetch chunks across all topic areas
+    instead of just the top-k most similar.
+    """
+    topic_queries = [
+        "program fee cost scholarship installment",
+        "curriculum topics modules terms syllabus",
+        "eligibility admission criteria apply selection",
+        "career placement salary companies hiring",
+        "faculty mentor professor instructor",
+        "program duration format online offline schedule",
+    ]
+    seen = set()
+    all_docs = []
+    for topic_query in topic_queries:
+        try:
+            results = db.similarity_search(topic_query, k=chunks_per_topic)
+            for doc in results:
+                if doc.page_content not in seen:
+                    seen.add(doc.page_content)
+                    all_docs.append(doc.page_content)
+        except Exception as e:
+            print(f"[BROAD] Topic query failed: {e}")
+    return all_docs
+
+
 def get_best_sentence(query, chunk_text, embeddings):
     sentences = [
         s.strip() for s in re.split(r'[.\n]', chunk_text)

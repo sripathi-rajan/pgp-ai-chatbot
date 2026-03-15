@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(playwright install:*)",
+      "Bash(python src/mastersunion_scraper.py)"
+    ]
+  }
+}
