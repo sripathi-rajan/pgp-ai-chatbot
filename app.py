@@ -63,11 +63,17 @@ def process_query(query):
     with st.chat_message("user"):
         st.write(query)
 
-    # ── Greeting shortcut — bypass RAG entirely ───────────────────────────────
-    GREETINGS = ["hi", "hello", "hey", "howdy", "good morning",
-                 "good evening", "good afternoon", "thanks", "thank you", "bye"]
-    if query.strip().lower().rstrip("!?.") in GREETINGS:
-        reply = "Hello! How can I help you with the PGP AI program today?"
+    # ── Detect intent first so conversational shortcut can use it ────────────
+    intent, confidence = detect_intent(query)
+
+    # ── Conversational shortcut — bypass RAG entirely ─────────────────────────
+    CONVERSATIONAL_RESPONSES = {
+        "👋 Greeting": "Hello! How can I help you with the PGP AI program today?",
+        "🙏 Thanks":   "You're welcome! Happy to help. Feel free to ask anything else about the PGP AI program.",
+        "👋 Farewell": "Goodbye! Feel free to come back if you have more questions about the program.",
+    }
+    if intent in CONVERSATIONAL_RESPONSES:
+        reply = CONVERSATIONAL_RESPONSES[intent]
         with st.chat_message("assistant"):
             st.markdown(reply)
         st.session_state.chat_history.append(("Student", query))
@@ -77,7 +83,6 @@ def process_query(query):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            intent, confidence = detect_intent(query)
 
             if confidence < 0.45:
                 clarification_map = {
