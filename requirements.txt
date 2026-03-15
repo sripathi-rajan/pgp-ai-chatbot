@@ -14,7 +14,6 @@ pypdf
 pdfplumber
 beautifulsoup4
 requests
-duckduckgo-search>=7.0.0
 transformers
 torch
 accelerate

@@ -14,14 +14,10 @@ os.environ["SERPER_API_KEY"] = serper_key or ""
 from core.pipeline import load_pipeline
 from core.retriever import hybrid_retrieve, get_best_sentence
 from core.intent import detect_intent, NO_WARNING_INTENTS
-from core.web_search import web_search_fallback
 from core.prompt import build_prompt
 from utils.notifier import notify_admin
 
 import streamlit.components.v1 as components
-
-# ── Feature flags ─────────────────────────────────────────────────────────────
-ENABLE_WEB_SEARCH = False   # set True to re-enable
 
 st.set_page_config(page_title="PGP AI Assistant", page_icon="🎓")
 st.title("🎓 PGP AI Program Assistant")
@@ -103,37 +99,6 @@ def process_query(query):
             long_query = any(w in query.lower() for w in long_answer_triggers)
             top_docs = hybrid_retrieve(query, db, bm25, texts, embeddings, k=3)
             context = "\n\n".join(top_docs)
-
-            # Check if local context is thin — trigger web search
-            low_context = len(context.strip()) < 500
-            faculty_query = any(w in query.lower() for w in
-                ["faculty", "professor", "mentor", "instructor", "teacher"])
-            company_query = any(w in query.lower() for w in
-                ["compan", "hire", "recruit", "employer", "who hires"])
-            news_query = any(w in query.lower() for w in
-                ["award", "news", "recent", "latest", "2024", "2025",
-                 "reddit", "quora", "review", "ranking", "rank",
-                 "batch", "intake", "size", "accreditat", "recogni"])
-            # Always search web if any trigger fires (low_confidence removed — pollutes local answers)
-            should_search = ENABLE_WEB_SEARCH and (low_context or faculty_query or company_query or news_query)
-
-            print(f"[DEBUG] Query: {query}")
-            print(f"[DEBUG] Triggers: low_context={low_context} faculty={faculty_query} "
-                  f"company={company_query} news={news_query}")
-            print(f"[DEBUG] Will search web: {should_search}")
-
-            web_context = ""
-            if should_search:
-                with st.spinner("🌐 Searching web for latest info..."):
-                    web_context = web_search_fallback(query)
-                print(f"[DEBUG] Web returned {len(web_context)} chars")
-                if web_context:
-                    context = context + "\n\nWEB SEARCH RESULTS:\n" + web_context[:1500]
-                    print(f"[DEBUG] Preview: {web_context[:300]}")
-                else:
-                    print("[DEBUG] Web search returned empty — no web context added")
-            else:
-                print("[DEBUG] Web search NOT triggered")
 
             prompt = build_prompt(query, context, st.session_state.chat_history)
 
@@ -322,7 +287,6 @@ with st.sidebar:
     st.caption("• MiniLM-L6 (Embeddings)")
     st.caption("• BM25 + RRF (Hybrid)")
     st.caption("• pdfplumber (PDF)")
-    st.caption("• BeautifulSoup (Web)")
 
 # ── Chat History Display ──────────────────────────────────────────────────────
 for msg in st.session_state.messages:
