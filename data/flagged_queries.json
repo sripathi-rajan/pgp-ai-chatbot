@@ -110,5 +110,73 @@
     ],
     "answer_attempt": "**Companies Hiring Graduates**:  \n- **Google**  \n- **Meta**  \n- **Apple**  \n- **Microsoft**  \n- **Samsung**  \n- **Amazon**  \n- **Paytm**  \n- **Accenture**  \n- **Flipkart**  \n- **Cisco**  \n- **ServiceNow**  \n- **Sprinklr**  \n- **Bain & Company**  \n- **Fractal**  \n- **Zepto**  \n- **Zomato**  \n- **Blinkit**  \n- **EY (Ernst & Young)**  \n- **Top companies in desired roles** (e.g., BCG, Zepto, EY, and startups in consulting, healthcare, and tech).  \n\nThese companies are highlighted in the brochure, we",
     "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 18:27",
+    "query": "Hi",
+    "chat_history": [],
+    "answer_attempt": "Hello. How can I assist you with Masters' Union today?",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 18:28",
+    "query": "hi",
+    "chat_history": [],
+    "answer_attempt": "Hello, how can I assist you with Masters' Union today?",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 21:25",
+    "query": "hi",
+    "chat_history": [],
+    "answer_attempt": "Hello, how can I assist you with Masters' Union today?",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 21:34",
+    "query": "who is owner of Masters union",
+    "chat_history": [],
+    "answer_attempt": "I don't have that detail. Please contact admissions at pgadmissions@mastersunion.org",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 21:35",
+    "query": "hi!",
+    "chat_history": [
+      {
+        "role": "Student",
+        "msg": "who is owner of Masters union"
+      },
+      {
+        "role": "Assistant",
+        "msg": "I don't have that detail. Please contact admissions at pgadmissions@mastersunion.org\n\n⚠️ This question isn't fully covered yet — our team has been notified and will improve the knowledge base soon. Thank you!"
+      }
+    ],
+    "answer_attempt": "Hello! How can I assist you with Masters' Union today?",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 21:51",
+    "query": "good answers",
+    "chat_history": [
+      {
+        "role": "Student",
+        "msg": "What companies hire graduates?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "The companies that hire graduates include:\n* Google\n* Meta\n* Apple\n* Microsoft\n* Samsung\n* Amazon\n* Paytm\n* Accenture\n* Flipkart\n* Cisco\n* ServiceNow\n* Sprinklr\n* Bain & Company\n* Fractal\n* Tata\n* Cognizant\n* CRISIL\n* BCG\n* Zepto\n* Zomato\n* Blinkit\n* EY\n* Boston Consulting Group\n* Kearney"
+      },
+      {
+        "role": "Student",
+        "msg": "hi"
+      },
+      {
+        "role": "Assistant",
+        "msg": "Hello! How can I help you with the PGP AI program today?"
+      }
+    ],
+    "answer_attempt": "It seems like you're looking for some good answers. However, I'd like to clarify what you're referring to. Are you looking for answers related to the PGP AI program, such as the curriculum, faculty, or companies that hire graduates? If so, I'd be happy to help. \n\nIf you're looking for answers related to the student entrepreneurs or startups mentioned, I can provide some information on that as well. For example, some of the startups include:\n* Memotag\n* The Good Browser\n* AIOS\n* SEMS\n* Bhupesh Ch",
+    "resolved": false
   }
 ]
