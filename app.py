@@ -151,6 +151,67 @@ OUT_OF_SCOPE = [
     "recipe", "joke", "poem", "write an essay",
 ]
 
+# ── Inference handler — eligibility/suitability questions ────────────────────
+KNOWN_ELIGIBILITY = """
+PGP in Applied AI & Agentic Systems — Eligibility:
+- Educational: BCA / B.Tech / BE or equivalent degree
+- Background: STEM preferred, but strong analytical aptitude from any discipline considered
+- Experience: Open to freshers (recent graduates) AND working professionals up to 5 years
+- Technical: Curiosity and comfort with technology required
+- Mindset: Problem-solving, logical thinking, ability to interpret patterns
+- Non-tech backgrounds: Accepted if they demonstrate strong analytical and quantitative aptitude
+- Managers/Professionals: Eligible under the weekend/online track designed for working professionals
+"""
+
+def _handle_inference(query, intent, confidence):
+    inference_prompt = f"""You are a helpful admissions counselor for Masters' Union.
+
+Using the eligibility criteria below, answer the user's question with clear reasoning.
+- Be direct: say YES, NO, or POSSIBLY with a brief explanation.
+- Mention what specifically makes them eligible or ineligible.
+- If borderline, explain what would strengthen their application.
+- Keep it under 5 sentences. No sources needed — this is your expert assessment.
+
+ELIGIBILITY CRITERIA:
+{KNOWN_ELIGIBILITY}
+
+USER QUESTION: {query}
+
+ANSWER:"""
+
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            placeholder = st.empty()
+            full_response = ""
+            try:
+                for chunk in llm.stream(inference_prompt):
+                    token = chunk.content if isinstance(chunk.content, str) else ""
+                    if token:
+                        full_response += token
+                        display = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL).strip()
+                        placeholder.markdown(display + "▌")
+            except Exception as e:
+                st.error(f"Error: {e}")
+                return
+
+        answer = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL).strip()
+        placeholder.markdown(answer)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.success(f"Intent: {intent}")
+        with col2:
+            st.info(f"Confidence: {confidence:.0%}")
+
+    st.session_state.chat_history.append(("Student", query))
+    st.session_state.chat_history.append(("Assistant", answer))
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer,
+        "intent": f"{intent} ({confidence:.0%})"
+    })
+
+
 # ── Process Query ─────────────────────────────────────────────────────────────
 def process_query(query):
     st.session_state.messages.append({"role": "user", "content": query})
@@ -173,6 +234,19 @@ def process_query(query):
         with st.chat_message("assistant"):
             st.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
+        return
+
+    # ── Inference routing — suitability/eligibility questions ────────────────
+    INFERENCE_TRIGGERS = [
+        "suitable for", "good for", "right for me", "fit for me",
+        "can someone", "can i join", "am i eligible", "will i qualify",
+        "should i join", "is it worth", "is this for me",
+        "non-tech", "non technical", "arts background", "commerce background",
+        "manager", "fresher", "without experience", "without degree", "without technical",
+    ]
+    if any(t in query.lower() for t in INFERENCE_TRIGGERS):
+        intent, confidence = detect_intent(query, llm=llm)
+        _handle_inference(query, intent, confidence)
         return
 
     # ── RAG pipeline ──────────────────────────────────────────────────────────
@@ -295,15 +369,33 @@ If a section has no data in context, skip it entirely. Do not invent anything.""
 
         high_sources.sort(key=lambda x: x[4], reverse=True)
 
-        # ── Low-confidence detection & admin notification ─────────────────────
-        is_uncertain = any(phrase in answer.lower() for phrase in [
-            "i don't have", "not found", "no information", "contact admissions",
-            "please contact", "i couldn't find", "not sure", "don't know",
-        ])
+        # ── Smarter uncertainty detection & admin notification ───────────────
+        GENUINE_GAPS = [
+            "i don't have that specific detail",
+            "i don't have that information",
+            "not mentioned anywhere",
+            "no data available",
+            "cannot find any reference",
+        ]
+        INFERABLE_PATTERNS = [
+            "suitable for", "good for", "can i join", "am i eligible",
+            "background", "experience", "non-tech", "manager", "fresher",
+            "should i", "is it worth", "will i", "can someone",
+        ]
+
+        is_genuinely_unknown = any(p in answer.lower() for p in GENUINE_GAPS)
+        is_inferable = any(p in query.lower() for p in INFERABLE_PATTERNS)
+        context_has_relevant = len(context.strip()) > 300
         context_too_short = len(context.strip()) < 100
         low_relevance = not high_sources or all(r < 0.28 for _, _, _, _, r, _ in high_sources)
 
-        if (is_uncertain or context_too_short or low_relevance) and intent not in NO_WARNING_INTENTS:
+        should_notify = (
+            (is_genuinely_unknown and not is_inferable and not context_has_relevant)
+            or (context_too_short and not is_inferable)
+            or (low_relevance and not is_inferable and not context_has_relevant)
+        )
+
+        if should_notify and intent not in NO_WARNING_INTENTS:
             threading.Thread(
                 target=notify_admin,
                 args=(query, list(st.session_state.chat_history), answer),

@@ -233,5 +233,45 @@
     ],
     "answer_attempt": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org",
     "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 23:55",
+    "query": "Is the program suitable for managers?",
+    "chat_history": [
+      {
+        "role": "Student",
+        "msg": "What is the duration of the PGP Applied AI program?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "The duration of the PGP in Applied AI & Agentic Systems is 15 months."
+      }
+    ],
+    "answer_attempt": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org",
+    "resolved": false
+  },
+  {
+    "timestamp": "2026-03-15 23:55",
+    "query": "Can someone without a technical background join?",
+    "chat_history": [
+      {
+        "role": "Student",
+        "msg": "What is the duration of the PGP Applied AI program?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "The duration of the PGP in Applied AI & Agentic Systems is 15 months."
+      },
+      {
+        "role": "Student",
+        "msg": "Is the program suitable for managers?"
+      },
+      {
+        "role": "Assistant",
+        "msg": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org\n\n⚠️ This question isn't fully covered yet — our team has been notified and will improve the knowledge base soon. Thank you!"
+      }
+    ],
+    "answer_attempt": "I don't have that information. Please contact admissions at pgadmissions@mastersunion.org",
+    "resolved": false
   }
 ]

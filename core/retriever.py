@@ -2,7 +2,31 @@ import re
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
+QUERY_EXPANSIONS = {
+    "manager":           "working professional experience eligibility",
+    "non-tech":          "non-technical background STEM eligibility criteria",
+    "non technical":     "non-technical background STEM eligibility criteria",
+    "arts background":   "non-STEM background eligibility analytical aptitude",
+    "commerce":          "non-technical background eligibility",
+    "mba":               "working professional management eligibility",
+    "fresher":           "recent graduate entry level eligibility",
+    "worth it":          "career outcomes placement salary benefits",
+    "good program":      "program overview benefits outcomes rankings",
+    "suitable for me":   "eligibility criteria target participants",
+}
+
+def expand_query(query: str) -> str:
+    q = query.lower()
+    expansions = []
+    for trigger, expansion in QUERY_EXPANSIONS.items():
+        if trigger in q:
+            expansions.append(expansion)
+    if expansions:
+        return query + " " + " ".join(expansions)
+    return query
+
 def hybrid_retrieve(query, db, bm25, texts, embeddings, k=5):
+    query = expand_query(query)
     semantic_results = db.similarity_search_with_relevance_scores(query, k=k*2)
     semantic_docs = [r[0].page_content for r in semantic_results]
     tokens = query.lower().split()
