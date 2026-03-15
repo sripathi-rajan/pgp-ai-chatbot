@@ -20,6 +20,9 @@ from utils.notifier import notify_admin
 
 import streamlit.components.v1 as components
 
+# ── Feature flags ─────────────────────────────────────────────────────────────
+ENABLE_WEB_SEARCH = False   # set True to re-enable
+
 st.set_page_config(page_title="PGP AI Assistant", page_icon="🎓")
 st.title("🎓 PGP AI Program Assistant")
 st.caption("Hybrid RAG · Intent Routing · Hallucination Guardrails")
@@ -112,7 +115,7 @@ def process_query(query):
                  "reddit", "quora", "review", "ranking", "rank",
                  "batch", "intake", "size", "accreditat", "recogni"])
             # Always search web if any trigger fires (low_confidence removed — pollutes local answers)
-            should_search = low_context or faculty_query or company_query or news_query
+            should_search = ENABLE_WEB_SEARCH and (low_context or faculty_query or company_query or news_query)
 
             print(f"[DEBUG] Query: {query}")
             print(f"[DEBUG] Triggers: low_context={low_context} faculty={faculty_query} "
