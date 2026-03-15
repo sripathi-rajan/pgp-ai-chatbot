@@ -26,6 +26,6 @@ CONTEXT:
 CONVERSATION HISTORY:
 {history_text}
 
-USER QUERY: {query}
+USER QUERY: {query} /no_think
 
 ANSWER:"""

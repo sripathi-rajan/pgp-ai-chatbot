@@ -163,11 +163,12 @@ def load_pipeline():
             temperature=0,
             base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
             num_ctx=4096,
-            num_predict=1500,
+            num_predict=2048,
             num_thread=8,
             num_batch=512,
             repeat_penalty=1.1,
             stream=True,
+            think=False,  # Disable chain-of-thought — avoids empty answers when token budget runs out
         )
     else:
         from langchain_groq import ChatGroq
