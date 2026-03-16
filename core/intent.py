@@ -6,6 +6,7 @@ EMOJI_MAP = {
     "Admissions":     "📋 Admissions",
     "Career":         "🚀 Career",
     "Faculty":        "👨‍🏫 Faculty",
+    "Overview":       "🎓 Overview",
     "Recommendation": "🎯 Recommendation",
     "Greeting":       "👋 Greeting",
     "Farewell":       "👋 Farewell",
@@ -19,6 +20,10 @@ KEYWORD_RULES = [
     ("📋 Admissions",     ["admission", "eligibility", "apply", "application", "selection", "interview", "criteria", "requirement", "qualify", "enroll", "join", "deadline"]),
     ("🚀 Career",         ["career", "placement", "hire", "hiring", "salary", "company", "job", "recruit", "employer", "package", "outcome", "ctc"]),
     ("👨‍🏫 Faculty",       ["faculty", "professor", "mentor", "teacher", "instructor", "who teaches"]),
+    ("🎓 Overview",       ["duration", "months", "how long", "online", "offline", "format", "schedule",
+                           "part-time", "full-time", "weekend", "weekday", "mode of", "delivery",
+                           "when does", "start date", "batch", "how many months", "program structure",
+                           "class timing", "timing", "location", "campus", "hybrid"]),
     ("🎯 Recommendation", ["best course", "which course", "recommend", "suitable", "should i", "compare", "which program", "right for me"]),
     ("👋 Greeting",       ["hello", "hi", "hey", "good morning", "good evening", "good afternoon", "good night", "howdy"]),
     ("🙏 Thanks",         ["thanks", "thank you", "thank", "appreciate", "grateful", "thx"]),
@@ -36,7 +41,7 @@ def _keyword_classify(query: str) -> tuple[str, float]:
 
 def _llm_classify(query: str, llm) -> tuple[str, float]:
     prompt = f"""Classify this user query into ONE intent category.
-Choose from: Fees, Curriculum, Admissions, Career, Faculty, Recommendation, Greeting, Farewell, Thanks, General.
+Choose from: Fees, Curriculum, Admissions, Career, Faculty, Overview, Recommendation, Greeting, Farewell, Thanks, General.
 Also give a confidence score between 0.0 and 1.0.
 
 Query: {query}
