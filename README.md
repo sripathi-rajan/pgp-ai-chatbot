@@ -1,241 +1,136 @@
 # Masters' Union AI Chatbot
 
-An AI-powered RAG (Retrieval-Augmented Generation) chatbot for Masters' Union that answers questions about programmes, fees, admissions, placements, and campus life.
+A chatbot that answers questions about Masters' Union programmes — fees, admissions, placements, curriculum, and campus life.
 
-## Features
+## What it does
 
-- **Hybrid retrieval**: FAISS (MMR semantic search) + BM25 keyword search
-- **13 intent categories**: Fees, Curriculum, Admissions, Career, Placement, Immersion, Overview, Faculty, Recommendation, Greeting, Thanks, Farewell, General
-- **28 programmes covered**: UG, PGP, Executive, Family Business, and Immersion programmes
-- **Structured responses**: Tree-format comparisons, ALL CAPS section headers, fee highlights
-- **Small-talk handling**: Greetings, farewells, and identity questions bypass RAG
-- **Out-of-scope filter**: Rejects irrelevant queries (cricket, weather, jokes, etc.)
-- **Programme catalogue fallback**: Hardcoded programme list injected for course-list queries
-- **Multi-LLM support**: Groq LLaMA (primary) → OpenAI GPT-4o-mini → Local Ollama (Qwen3)
+- Understands questions about **28 programmes** (UG, PGP, Executive, Family Business, Immersion)
+- Answers from real programme data using AI (Groq LLaMA by default)
+- Handles follow-up questions with conversation history
+- Rejects off-topic queries (cricket scores, weather, jokes, etc.)
 
-## Architecture
+## Setup
 
-```
-User Browser
-    |
-    v
-Flask Server (app.py :5000)
-    |
-    |-- Intent Detection (core/intent.py)
-    |       keyword-first → LLM fallback
-    |
-    |-- Hybrid Retrieval (core/retriever.py)
-    |       FAISS MMR + BM25 Okapi → merged, deduped
-    |
-    |-- Prompt Builder (core/prompt.py)
-    |       context + history + formatting rules
-    |
-    +-- LLM (Groq / OpenAI / Ollama)
-            → post_process_answer() → JSON response
-```
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Web server | Flask + flask-cors |
-| Embeddings | sentence-transformers/all-MiniLM-L6-v2 |
-| Vector store | FAISS (langchain-community) |
-| Keyword search | BM25Okapi (rank-bm25) |
-| Primary LLM | Groq llama-3.1-8b-instant |
-| Fallback LLM | OpenAI gpt-4o-mini |
-| Local LLM | Qwen3 1.7B via Ollama |
-| PDF extraction | pdfplumber |
-| Text splitting | RecursiveCharacterTextSplitter |
-| Frontend | Vanilla HTML/CSS/JS (Tailwind CDN) |
-
-## Quick Start
-
-### 1. Install dependencies
+### Step 1 — Install packages
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Set environment variables
+### Step 2 — Add your API key
 
+On **Mac/Linux**:
 ```bash
-# Required (choose one LLM provider)
 export GROQ_API_KEY=gsk_your_key_here
-
-# Optional fallback
-export OPENAI_API_KEY=sk_your_key_here
-
-# Optional -- enable local Ollama instead
-export USE_LOCAL_LLM=true
 ```
 
-On Windows:
+On **Windows**:
 ```cmd
 set GROQ_API_KEY=gsk_your_key_here
 ```
 
-### 3. Ingest data
+> Get a free Groq key at console.groq.com. If you have an OpenAI key, set `OPENAI_API_KEY` instead.
+
+### Step 3 — Index the data
 
 ```bash
-python scripts/ingest_pdfs.py          # incremental
-python scripts/ingest_pdfs.py --force  # full rebuild
+python scripts/ingest_pdfs.py
 ```
 
-### 4. Start the server
+### Step 4 — Run the chatbot
 
 ```bash
 python app.py
-# Open http://localhost:5000
 ```
 
-## Data Pipeline
+Open **http://localhost:5000** in your browser.
 
-```
-PDFs (data/*.pdf)
-    +-- scripts/ingest_pdfs.py
-            |-- pdfplumber extraction
-            |-- OCR cleaning (utils/ocr_cleaner.py)
-            |-- RecursiveCharacterTextSplitter (3600 chars / 600 overlap)
-            +-- FAISS index (./faiss_index/)
-
-Scraped text (data/raw/*.txt)
-    +-- load_scraped_data() in core/pipeline.py
-
-Manual data (data/program_data.txt)
-    +-- Loaded as single Document
-```
-
-Total indexed chunks (v1.0.0): ~1452 (1307 PDF + 145 text)
+---
 
 ## Programmes Covered
 
-**Undergraduate (UG)**
-- UG in Technology & Business Management
-- UG in Psychology & Marketing
-- UG in Data Science & AI
-- UG in Finance & Economics
-- UG Programme in Design (MUDS)
-- UG TBM / Psychology & Marketing / DS&AI (Illinois Tech, US)
-- UG TBM (Griffith University, Australia)
+**Undergraduate**
+- Technology & Business Management
+- Psychology & Marketing
+- Data Science & AI
+- Finance & Economics
+- Design (MUDS)
+- TBM / Psychology & Marketing / DS&AI (Illinois Tech, USA)
+- TBM (Griffith University, Australia)
 
 **Postgraduate (PGP)**
-- PGP in Technology & Business Management
-- PGP in Technology & Business Management (Young Leaders Cohort)
-- PGP in Human Resources & Organisation Strategy
-- PGP in Sports Management & Gaming
-- PGP in Applied AI & Agentic Systems
-- PGP in UI/UX & AI Product Design
-- PGP in Sustainability & Business Management
+- Technology & Business Management
+- Technology & Business Management (Young Leaders Cohort)
+- Human Resources & Organisation Strategy
+- Sports Management & Gaming
+- Applied AI & Agentic Systems
+- UI/UX & AI Product Design
+- Sustainability & Business Management
 
 **Executive**
 - PGP Rise: General Management
-- PGP in Capital Markets and Trading
-- PGP in Entrepreneurship and Business Acceleration
+- Capital Markets and Trading
+- Entrepreneurship and Business Acceleration
 - PGP Rise: General Management (Global)
 - Bloomberg Equity Research Programme
 
 **Family Business**
 - PGP Rise: Owners and Promoters Management
-- PGP in Entrepreneurship and Business Acceleration
+- Entrepreneurship and Business Acceleration
 
 **Immersion**
 - PGP Bharat
 - Bharat Fellowship
 
-## API Reference
+---
 
-### POST /ask
-
-Request body:
-```json
-{
-  "query": "What is the fee for PGP TBM?",
-  "history": [["user", "Hi"], ["assistant", "Hello!"]]
-}
-```
-
-Response:
-```json
-{
-  "answer": "FEES:
-PGP TBM
-├─ Total Fee: ₹22,65,000
-└─ Duration: 11 months
----",
-  "category": "Fees",
-  "model": "llama-3.1-8b-instant"
-}
-```
-
-Categories: `Fees` | `Curriculum` | `Admissions` | `Career` | `Overview`
-
-### GET /
-
-Serves the chatbot frontend (`index.html`).
-
-## Project Structure
+## Project Files
 
 ```
 pgp-ai-chatbot/
-├── app.py                    # Flask server + RAG orchestration
-├── streamlit_app.py          # Original Streamlit interface (preserved)
-├── index.html                # Chatbot frontend (served by Flask)
-├── requirements.txt
+├── app.py              # Main server (run this)
+├── index.html          # Chatbot UI
 ├── core/
-│   ├── pipeline.py           # Data loading, FAISS indexing, LLM setup
-│   ├── retriever.py          # Hybrid MMR+BM25 retrieval, query expansion
-│   ├── intent.py             # Intent classification (keyword + LLM)
-│   └── prompt.py             # Prompt builder + context formatter
+│   ├── pipeline.py     # Loads data and sets up AI
+│   ├── retriever.py    # Finds relevant information
+│   ├── intent.py       # Understands what the user is asking
+│   └── prompt.py       # Builds the AI prompt
 ├── data/
-│   ├── program_data.txt      # Manual programme data (all 28 programmes)
-│   ├── brochure.pdf          # PDF brochure (if available)
-│   └── raw/                  # Scraped .txt and PDF JSON extracts
-├── scripts/
-│   └── ingest_pdfs.py        # PDF ingestion pipeline
-├── src/
-│   └── mastersunion_scraper.py
-├── utils/
-│   └── ocr_cleaner.py
-└── faiss_index/              # Auto-generated (gitignored)
-    └── .built_by_app         # Sentinel: marks index as trusted
+│   ├── program_data.txt  # Programme details
+│   ├── brochure.pdf      # PDF brochure (optional)
+│   └── raw/              # Scraped pages
+└── scripts/
+    └── ingest_pdfs.py    # Indexes PDFs into the search database
 ```
+
+---
 
 ## Configuration
 
-| Environment Variable | Default | Description |
-|---|---|---|
-| `GROQ_API_KEY` | — | Groq API key (primary LLM) |
-| `OPENAI_API_KEY` | — | OpenAI API key (fallback LLM) |
-| `SERPER_API_KEY` | — | Serper key (web search, optional) |
-| `USE_LOCAL_LLM` | `false` | Use local Ollama instead of cloud LLMs |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
+| Variable | What it does |
+|---|---|
+| `GROQ_API_KEY` | Groq API key — used by default |
+| `OPENAI_API_KEY` | OpenAI fallback if no Groq key |
+| `USE_LOCAL_LLM=true` | Use a local Ollama model instead |
 
-## Streamlit Interface
+---
 
-The original Streamlit interface is preserved:
+## API Key Safety
+
+- Your API key is **never sent to the browser** — it stays on the server only.
+- Other users **cannot read your key**, but if your server is publicly accessible they can send requests that use your quota.
+- For local use on your own machine, you are completely safe.
+
+---
+
+## Streamlit (alternative UI)
 
 ```bash
 streamlit run streamlit_app.py
 ```
 
-Streamlit reads LLM config from `.streamlit/secrets.toml`. Flask reads from environment variables.
+---
 
-## Security Notes
+## Version
 
-- **API key is server-side only**: the key is stored in an environment variable and is never sent to the browser or included in frontend code. Other users cannot read your key.
-- **Quota consumption risk**: if your Flask server is publicly accessible (e.g., via ngrok), anyone can POST to `/ask` and use your API quota. Add authentication or rate limiting before any public deployment.
-- **Prompt injection protection**: input is sanitised against injection patterns and capped at 500 characters.
-- **FAISS trust**: deserialization is gated by a `.built_by_app` sentinel file written only by this application.
-
-## Version History
-
-### v1.0.0 (2026-03-16)
-- Flask server with `/ask` and `/` endpoints (replaces Streamlit)
-- Hybrid FAISS MMR + BM25 retrieval with full Document metadata propagation
-- Groq LLaMA 3.1 8B Instant (primary), OpenAI GPT-4o-mini (fallback), Qwen3 (local)
-- 28-programme hardcoded catalogue for course-list queries
-- Tree-format structured responses (`├─ └─`) with CSS-styled frontend rendering
-- `post_process_answer()`: pipe-table → tree conversion, recommendation wrapping
-- 13-intent keyword classifier with LLM fallback
-- ~1452 indexed chunks (1307 PDF + 145 text)
+**v1.0.0** — Flask server, hybrid RAG retrieval, Groq LLaMA, 28 programmes, ~1452 indexed chunks.
