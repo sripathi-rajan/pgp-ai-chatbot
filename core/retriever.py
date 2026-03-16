@@ -1,5 +1,7 @@
+import json
 import re
 import numpy as np
+from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 
 QUERY_EXPANSIONS = {
@@ -71,6 +73,99 @@ def broad_retrieve(query, db, bm25, texts, embeddings, chunks_per_topic=2):
         except Exception as e:
             print(f"[BROAD] Topic query failed: {e}")
     return all_docs
+
+
+# ─── PDF CHUNK INDEXING HELPERS ───────────────────────────────────────────────
+# Default path for the manifest that tracks which PDF chunk IDs are already
+# in the FAISS index. Keeping it inside faiss_index/ means it travels with the
+# index when the directory is copied or archived.
+_DEFAULT_MANIFEST = "faiss_index/pdf_manifest.json"
+
+
+def load_pdf_manifest(manifest_path: str = _DEFAULT_MANIFEST) -> set:
+    """
+    Return the set of chunk IDs that have already been indexed into FAISS.
+    Returns an empty set if the manifest file doesn't exist yet.
+    """
+    p = Path(manifest_path)
+    if p.exists():
+        try:
+            return set(json.loads(p.read_text(encoding="utf-8")))
+        except Exception:
+            return set()
+    return set()
+
+
+def save_pdf_manifest(chunk_ids: set, manifest_path: str = _DEFAULT_MANIFEST):
+    """Persist the full set of indexed chunk IDs to the manifest JSON file."""
+    p = Path(manifest_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
+        json.dumps(sorted(chunk_ids), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def index_pdf_chunks_to_faiss(
+    chunks,                              # list[Document] from ingest_pdf_data()
+    embeddings,                          # HuggingFaceEmbeddings (or compatible)
+    faiss_index_path: str = "./faiss_index",
+    manifest_path: str = _DEFAULT_MANIFEST,
+) -> tuple:
+    """
+    Add PDF chunks to the FAISS index, skipping any chunk whose chunk_id is
+    already recorded in the manifest file (incremental / idempotent).
+
+    If the index does not yet exist, a fresh one is built from the supplied
+    chunks and the sentinel file (.built_by_app) is written so that
+    pipeline.py treats it as trusted.
+
+    Returns (added: int, skipped: int).
+    """
+    # Lazy import — keeps retriever.py importable without langchain installed
+    from langchain_community.vectorstores import FAISS
+
+    # Load the set of already-indexed chunk IDs to skip duplicates
+    indexed_ids = load_pdf_manifest(manifest_path)
+
+    # Filter out chunks that have already been indexed
+    new_chunks = [
+        c for c in chunks
+        if c.metadata.get("chunk_id", "") not in indexed_ids
+    ]
+    skipped = len(chunks) - len(new_chunks)
+
+    if not new_chunks:
+        print(f"[FAISS] All {len(chunks)} PDF chunk(s) already indexed — nothing to do")
+        return 0, skipped
+
+    index_path   = Path(faiss_index_path)
+    sentinel     = index_path / ".built_by_app"
+
+    if index_path.exists() and sentinel.exists():
+        # Merge new chunks into the existing trusted index
+        existing_db = FAISS.load_local(
+            str(index_path),
+            embeddings,
+            allow_dangerous_deserialization=True,   # safe: sentinel confirms our origin
+        )
+        new_db = FAISS.from_documents(new_chunks, embeddings)
+        existing_db.merge_from(new_db)              # in-place merge
+        existing_db.save_local(str(index_path))
+        print(f"[FAISS] Merged {len(new_chunks)} new PDF chunk(s) into existing index")
+    else:
+        # No existing index — build a fresh one from these chunks only
+        db = FAISS.from_documents(new_chunks, embeddings)
+        db.save_local(str(index_path))
+        sentinel.touch()    # mark the index as trusted for pipeline.py
+        print(f"[FAISS] Built new FAISS index with {len(new_chunks)} PDF chunk(s)")
+
+    # Persist updated manifest so next run knows what's already indexed
+    new_ids = {c.metadata["chunk_id"] for c in new_chunks if "chunk_id" in c.metadata}
+    indexed_ids.update(new_ids)
+    save_pdf_manifest(indexed_ids, manifest_path)
+
+    return len(new_chunks), skipped
 
 
 def get_best_sentence(chunk_text, embeddings, query_vec):

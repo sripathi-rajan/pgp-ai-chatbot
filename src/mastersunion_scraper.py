@@ -19,6 +19,7 @@ Usage:
     python mastersunion_scraper.py
 """
 
+import json
 import re
 import sys
 import time
@@ -376,6 +377,134 @@ def scrape_all():
     print(f"  {len(files)} text files, {total_chars:,} total chars")
     print(f"  Output: {RAW_DIR}/")
     print("=" * 50)
+
+
+# ─── PDF → RAW JSON EXTRACTOR ─────────────────────────────────────────────────
+
+# Filename keyword → category mapping used by _categorise_pdf()
+_CATEGORY_KEYWORDS = {
+    "pgp":       ["pgp", "postgraduate", "post-graduate", "post_graduate"],
+    "ug":        ["ug", "undergraduate", "under-graduate", "under_graduate", "btech", "b_tech"],
+    "executive": ["executive", "capital", "entrepreneurship", "rise", "general_mgmt"],
+}
+
+
+def _categorise_pdf(filename: str) -> str:
+    """Infer category (pgp / ug / executive / general) from the PDF filename."""
+    name_lower = filename.lower()
+    for category, keywords in _CATEGORY_KEYWORDS.items():
+        if any(kw in name_lower for kw in keywords):
+            return category
+    return "general"
+
+
+def extract_pdfs_to_raw(
+    source_dir: str = "mastersunion_files",
+    output_dir: str = "data/raw",
+) -> dict:
+    """
+    Extract text from all PDFs in `source_dir` using PyMuPDF (fitz),
+    clean each page with clean_ocr(), categorise by filename keywords,
+    and save one JSON file per PDF into data/raw/<category>/.
+
+    Skips PDFs that already have a matching JSON output file so
+    re-running the script is safe and fast.
+
+    Returns a summary dict: {"processed": int, "skipped": int, "failed": int}.
+    """
+    # PyMuPDF ships as the 'fitz' namespace
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        print("[PDF] PyMuPDF not installed. Run: pip install pymupdf")
+        return {"processed": 0, "skipped": 0, "failed": 0}
+
+    # Allow running this file directly (sys.path may not include project root)
+    try:
+        from utils.ocr_cleaner import clean_ocr
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from utils.ocr_cleaner import clean_ocr
+
+    src = Path(source_dir)
+    out = Path(output_dir)
+
+    if not src.exists():
+        print(f"[PDF] Source directory '{src}' not found.")
+        return {"processed": 0, "skipped": 0, "failed": 0}
+
+    # Collect all PDFs (top-level + one level deep)
+    pdf_files = sorted(src.glob("*.pdf")) + sorted(src.glob("**/*.pdf"))
+    # Deduplicate in case ** also matched top-level files
+    seen_paths: set = set()
+    unique_pdfs = []
+    for p in pdf_files:
+        if p not in seen_paths:
+            seen_paths.add(p)
+            unique_pdfs.append(p)
+
+    print(f"[PDF] Found {len(unique_pdfs)} PDF(s) in '{src}'")
+
+    stats = {"processed": 0, "skipped": 0, "failed": 0}
+
+    for pdf_path in unique_pdfs:
+        stem     = pdf_path.stem          # filename without extension
+        category = _categorise_pdf(pdf_path.name)
+        cat_dir  = out / category
+        cat_dir.mkdir(parents=True, exist_ok=True)
+
+        out_file = cat_dir / f"{stem}.json"
+
+        # Skip already-processed files to avoid duplicate work
+        if out_file.exists():
+            print(f"  [SKIP] {pdf_path.name} — already processed ({out_file})")
+            stats["skipped"] += 1
+            continue
+
+        try:
+            doc   = fitz.open(str(pdf_path))
+            pages = []
+
+            for page_idx in range(len(doc)):
+                raw_text = doc[page_idx].get_text("text") or ""
+                cleaned  = clean_ocr(raw_text)
+                # Ignore blank / near-blank pages (likely scanned images)
+                if len(cleaned.strip()) > 30:
+                    pages.append({
+                        "page_num": page_idx + 1,   # 1-based for readability
+                        "text":     cleaned,
+                    })
+
+            doc.close()
+
+            if not pages:
+                print(f"  [WARN] {pdf_path.name} — no extractable text (possibly scanned-image PDF)")
+                stats["failed"] += 1
+                continue
+
+            # Serialise to JSON and write
+            payload = {
+                "filename": pdf_path.name,
+                "stem":     stem,
+                "category": category,
+                "pages":    pages,
+            }
+            out_file.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            print(f"  [OK]  {pdf_path.name} → {out_file} ({len(pages)} page(s))")
+            stats["processed"] += 1
+
+        except Exception as exc:
+            print(f"  [ERR] {pdf_path.name} → {exc}")
+            stats["failed"] += 1
+
+    print(
+        f"\n[PDF] Done — processed:{stats['processed']}  "
+        f"skipped:{stats['skipped']}  failed:{stats['failed']}"
+    )
+    return stats
 
 
 if __name__ == "__main__":

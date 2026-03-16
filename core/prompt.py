@@ -1,3 +1,38 @@
+def format_context(chunks) -> str:
+    """
+    Format a list of retrieved chunks into a single context string for the prompt.
+
+    Chunks may be:
+      - LangChain Document objects with metadata (PDF or scraped)
+      - Plain strings (legacy path — passed through unchanged)
+
+    PDF chunks (metadata["type"] == "pdf") get a labelled header so the LLM
+    knows the provenance of each passage:
+        [Source: pgp_brochure_2024.pdf | Category: PGP | Page: 3]
+        <chunk text>
+
+    Non-PDF Document objects are included as plain text.
+    Each chunk is separated by a blank line.
+    """
+    parts = []
+    for chunk in chunks:
+        if hasattr(chunk, "metadata") and chunk.metadata.get("type") == "pdf":
+            # Build a rich header for PDF-sourced chunks
+            source   = chunk.metadata.get("source", "unknown")
+            category = chunk.metadata.get("category", "general").upper()
+            page     = chunk.metadata.get("page", "")
+            page_tag = f" | Page: {page}" if page else ""
+            header   = f"[Source: {source} | Category: {category}{page_tag}]"
+            parts.append(f"{header}\n{chunk.page_content}")
+        elif hasattr(chunk, "page_content"):
+            # Scraped / plain Document — no special header needed
+            parts.append(chunk.page_content)
+        else:
+            # Raw string fallback
+            parts.append(str(chunk))
+    return "\n\n".join(parts)
+
+
 def build_prompt(query: str, context: str, chat_history: list, intent: str = "") -> str:
     history_text = ""
     if chat_history:

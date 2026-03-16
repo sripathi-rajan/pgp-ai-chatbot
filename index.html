@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Masters' Union - Learn by Doing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@1,400&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --mu-teal: #0fb881;
+            --mu-blue: #3b82f6;
+            --mu-orange: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000;
+            margin: 0;
+            overflow-x: hidden;
+            color: white;
+        }
+
+        .font-script {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+        }
+
+        /* No Preloader */
+
+        /* Background & Polish */
+        .bg-wrap {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            transform: translateZ(0); /* Speed boost */
+            transition: 3s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        body.loaded .bg-wrap {
+            scale: 1;
+        }
+
+        .gradient-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%);
+        }
+
+        /* Typography */
+        .hero-title {
+            font-size: clamp(60px, 9vw, 150px);
+            line-height: 0.9;
+            font-weight: 600;
+            letter-spacing: -0.04em;
+        }
+
+        .doing-container {
+            position: relative;
+            display: inline-block;
+            padding-bottom: 25px;
+            margin-left: 15px;
+        }
+
+        .doing-text {
+            font-size: clamp(70px, 10vw, 170px);
+            font-weight: 400;
+            color: #fff;
+            line-height: 1;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Animated Wavy Line */
+        .wavy-svg {
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 110%;
+            height: 50px;
+            pointer-events: none;
+        }
+
+        .wave-path {
+            fill: none;
+            stroke-width: 6;
+            stroke-linecap: round;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            transition: stroke-dashoffset 2s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        body.loaded .wave-path {
+            stroke-dashoffset: 0;
+        }
+
+        /* Navigation */
+        .top-nav {
+            height: 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 24px;
+            padding: 0 40px;
+        }
+
+        .top-nav a {
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .main-nav {
+            padding: 25px 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-link {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            color: white;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .nav-link span {
+            font-size: 9px;
+            opacity: 0.5;
+        }
+
+        /* Buttons */
+        .btn-main {
+            padding: 18px 40px;
+            border-radius: 99px;
+            font-size: 14px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            transition: 0.3s;
+        }
+
+        .btn-white {
+            background: white;
+            color: black;
+        }
+
+        .btn-white:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-outline {
+            border: 1.5px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            color: white;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-outline:hover {
+            border-color: white;
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Sidebar */
+        #chat-sidebar {
+            position: fixed;
+            top: 0;
+            right: -500px;
+            width: 500px;
+            height: 100vh;
+            background: rgba(10, 14, 20, 0.98);
+            backdrop-filter: blur(80px);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 100000;
+            transition: right 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        #chat-sidebar.open {
+            right: 0;
+        }
+
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: 40px;
+            right: 40px;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #f7d08a 0%, #d4af37 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 99999;
+            transition: 0.3s;
+            box-shadow: 0 10px 40px rgba(212, 175, 55, 0.4);
+        }
+
+        .fab:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        /* Accreditations */
+        .badge-box {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 30px;
+            position: fixed;
+            bottom: 130px;
+            right: 40px;
+            z-index: 99998;
+            pointer-events: none;
+        }
+
+        .logos {
+            display: flex;
+            gap: 40px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            pointer-events: auto;
+        }
+    </style>
+</head>
+
+<body class="bg-black">
+
+    <!-- Max Speed Load -->
+
+    <!-- Real Content -->
+    <div class="bg-wrap">
+        <img src="bg.webp" class="w-full h-full object-cover" fetchpriority="high" loading="eager">
+        <div class="gradient-overlay"></div>
+    </div>
+
+    <div id="chat-sidebar" style="z-index: 100000;">
+        <div class="p-10 flex justify-between items-center border-b border-white/10">
+            <div>
+                <h3 class="text-xl font-bold">Masters' Union AI</h3>
+                <p class="text-[9px] uppercase tracking-[0.3em] font-black text-blue-500 mt-1">Admission Intelligence
+                </p>
+            </div>
+            <button onclick="window.toggleChat()" class="text-white/40 hover:text-white transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="flex-grow overflow-y-auto p-10 space-y-6" id="chat-messages">
+            <div class="bg-white/5 border border-white/10 p-5 rounded-2xl text-sm leading-relaxed max-w-[90%]">Hi! 👋 I'm the Masters' Union AI Assistant. Ask me anything about programmes, fees, admissions, placements or campus life!</div>
+        </div>
+        <div class="p-10 border-t border-white/10">
+            <div id="typing" class="text-[10px] text-blue-400 mb-4 hidden font-black tracking-widest uppercase">
+                Thinking...</div>
+            <div
+                class="flex gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 focus-within:border-blue-500 transition">
+                <input type="text" id="chat-input" placeholder="Type your question..."
+                    class="bg-transparent border-none outline-none flex-grow text-sm px-4 py-3 text-white"
+                    onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold text-sm transition tracking-widest uppercase">Ask</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Modal -->
+    <div id="video-modal"
+        class="fixed inset-0 z-[20000] hidden flex items-center justify-center bg-black/95 backdrop-blur-3xl">
+        <button onclick="window.toggleVideo()"
+            class="absolute top-10 right-10 text-white/50 hover:text-white transition">
+            <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <div class="w-full max-w-5xl aspect-video px-4">
+            <iframe id="hero-video" class="w-full h-full rounded-2xl shadow-2xl border border-white/10" src=""
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <header class="relative z-10">
+        <div class="top-nav">
+            <a href="#">Enterprise L&D <span>⌄</span></a>
+            <a href="#">For Companies</a>
+            <a href="#">Jobs</a>
+            <a href="#">Events</a>
+            <a href="#">Become a Master</a>
+            <a href="#">Blog</a>
+        </div>
+
+        <div class="main-nav">
+            <div class="flex items-center gap-4">
+                <svg class="w-10 h-10 text-white" viewBox="0 0 40 40" fill="none">
+                    <path d="M10 5 C15 20, 10 35, 10 35 M20 5 C25 20, 20 35, 20 35 M30 5 C35 20, 30 35, 30 35"
+                        stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity="0.8" />
+                </svg>
+                <div class="text-[20px] font-black leading-[0.85] tracking-tighter uppercase">masters'<br><span
+                        class="opacity-80">union</span></div>
+            </div>
+
+            <nav class="hidden lg:flex gap-8">
+                <a href="#" class="nav-link">ABOUT US <span>⌄</span></a>
+                <a href="#" class="nav-link">ACADEMICS <span>⌄</span></a>
+                <a href="#" class="nav-link">CAREERS</a>
+                <a href="#" class="nav-link">STUDENT LIFE <span>⌄</span></a>
+                <a href="#" class="nav-link">INNOVATION <span>⌄</span></a>
+                <a href="#" class="nav-link">FACULTY</a>
+                <a href="#" class="nav-link">MU VENTURES <span>⌄</span></a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="relative z-10 px-8 md:px-16 lg:px-24 min-h-[80vh] flex items-center">
+        <div>
+            <h1 class="hero-title">
+                Learn<br>
+                <div class="flex items-center">
+                    by
+                    <div class="doing-container">
+                        <span class="doing-text font-script">Doing</span>
+                        <svg class="wavy-svg" viewBox="0 0 450 60" preserveAspectRatio="none">
+                            <path class="wave-path" d="M0,25 Q112,0 225,25 T450,25" stroke="var(--mu-teal)"
+                                style="transition-delay: 0.2s;" />
+                            <path class="wave-path" d="M0,40 Q112,15 225,40 T450,40" stroke="var(--mu-blue)"
+                                opacity="0.7" style="transition-delay: 0.4s;" />
+                            <path class="wave-path" d="M0,55 Q112,30 225,55 T450,55" stroke="var(--mu-orange)"
+                                opacity="0.5" style="transition-delay: 0.6s;" />
+                        </svg>
+                    </div>
+                </div>
+            </h1>
+
+            <div class="flex flex-wrap gap-6 mt-16">
+                <button onclick="window.toggleVideo()" class="btn-main btn-white shadow-xl">
+                    Watch Intro Video <span class="text-xl">↗</span>
+                </button>
+                <button class="btn-main btn-outline">
+                    Download Yearbook <svg class="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <div class="badge-box">
+        <div class="logos hidden lg:flex">
+            <div class="text-[10px] font-black tracking-widest border-r border-white/10 pr-6">BSIS<br>IMPACT</div>
+            <div class="text-[10px] font-black tracking-widest border-r border-white/10 pr-6 text-pink-500">
+                EFMD<br>GLOBAL</div>
+            <div class="flex flex-col">
+                <span class="text-[10px] font-black tracking-widest text-[#00a39d]">AACSB</span>
+                <span class="text-[7px] font-normal tracking-tight text-white/50 uppercase">Business Education
+                    Alliance</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Trigger Moved Outside for Visibility -->
+    <div class="fab" id="ai-trigger" onclick="window.toggleChat()" title="Chat with AI">
+        <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" />
+        </svg>
+    </div>
+
+    <script>
+        // 1. Instant Reveal
+        document.addEventListener('DOMContentLoaded', () => { 
+            document.body.classList.add('loaded'); 
+        });
+
+        // 2. Interaction Handlers (Exposed to Window)
+        window.toggleChat = function () {
+            const sidebar = document.getElementById('chat-sidebar');
+            if (sidebar) sidebar.classList.toggle('open');
+        };
+
+        window.toggleVideo = function () {
+            const modal = document.getElementById('video-modal');
+            const iframe = document.getElementById('hero-video');
+            if (!modal || !iframe) return;
+
+            const isHidden = modal.classList.contains('hidden');
+            if (isHidden) {
+                modal.classList.remove('hidden');
+                iframe.src = "https://www.youtube.com/embed/R9N3F6gGvLo?autoplay=1";
+            } else {
+                modal.classList.add('hidden');
+                iframe.src = "";
+            }
+        };
+
+        window.sendMessage = async function () {
+            const chatMessages = document.getElementById('chat-messages');
+            const chatInput = document.getElementById('chat-input');
+            const typing = document.getElementById('typing');
+
+            if (!chatInput || !chatMessages || !typing) return;
+            const query = chatInput.value.trim();
+            if (!query) return;
+
+            addMessage(query, 'user');
+            chatInput.value = '';
+            typing.classList.remove('hidden');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const res = await fetch('http://localhost:5000/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                const data = await res.json();
+                typing.classList.add('hidden');
+                addMessage(data.answer || "No response received", 'bot', data.category, data.model);
+            } catch (e) {
+                console.error("Chat Error:", e);
+                typing.classList.add('hidden');
+                addMessage("⚠️ Could not connect to the server. Please make sure the Flask server is running: <code>python app.py</code>", 'bot');
+            }
+        };
+
+        function addMessage(text, role, category = '', model = '') {
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
+
+            const div = document.createElement('div');
+            div.className = role === 'user'
+                ? "bg-blue-600 text-white p-5 rounded-2xl text-sm leading-relaxed max-w-[85%] self-end ml-auto"
+                : "bg-white/5 border border-white/10 p-5 rounded-2xl text-sm leading-relaxed max-w-[90%]";
+
+            let html = '';
+            if (category) {
+                const colors = { 'Fees': '#f59e0b', 'Curriculum': '#3b82f6', 'Admissions': '#10b981', 'Career': '#8b5cf6', 'Overview': '#ec4899' };
+                html += `<span class="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded inline-block mb-3" style="background:${colors[category] || '#64748b'}">${category}</span><br>`;
+            }
+            html += text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            if (model) html += `<div class="text-[8px] opacity-30 mt-4 text-right uppercase tracking-widest">Powered by ${model}</div>`;
+
+            div.innerHTML = html;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        /* Readiness Meta */
+    </script>
+</body>
+
+</html>
