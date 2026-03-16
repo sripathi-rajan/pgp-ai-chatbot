@@ -4,9 +4,6 @@ Serves the HTML frontend and exposes the /ask POST endpoint.
 
 Run:  python app.py
 Open: http://localhost:5000
-
-NOTE: The original Streamlit interface is preserved in streamlit_app.py
-      Run it with:  streamlit run streamlit_app.py
 """
 
 import os
@@ -25,10 +22,9 @@ from flask_cors import CORS
 
 # ── API Keys (read from environment variables) ───────────────────────────────
 groq_key = os.environ.get("GROQ_API_KEY", "")
+if not groq_key:
+    print("[WARN] GROQ_API_KEY not set — LLM calls will fail")
 os.environ["GROQ_API_KEY"] = groq_key
-
-openai_key = os.environ.get("OPENAI_API_KEY", "")
-os.environ["OPENAI_API_KEY"] = openai_key
 
 serper_key = os.environ.get("SERPER_API_KEY", "")
 if not serper_key:
@@ -413,14 +409,13 @@ Skip any section with no data in context. Do not invent anything."""
         exc_str = str(exc).lower()
         if "insufficient_quota" in exc_str or "rate_limit" in exc_str or "429" in exc_str:
             answer = (
-                "⚠️ The OpenAI API quota is exhausted. "
-                "Please add credits at platform.openai.com, or set USE_LOCAL_LLM=true "
-                "to use a local Ollama model."
+                "⚠️ The API quota is exhausted or rate-limited. "
+                "Please check your Groq API usage at console.groq.com."
             )
         elif "auth" in exc_str or "api_key" in exc_str or "401" in exc_str:
             answer = (
-                "⚠️ OpenAI API key is invalid or missing. "
-                "Set the OPENAI_API_KEY environment variable and restart the server."
+                "⚠️ API key is invalid or missing. "
+                "Set the GROQ_API_KEY environment variable and restart the server."
             )
         else:
             answer = "Sorry, I could not process your request. Please try again."
