@@ -187,6 +187,87 @@ def _sanitize(query: str):
     return query or None
 
 
+# ── Post-process LLM answer for clean, consistent formatting ──────────────────
+_TABLE_ROW_RE   = re.compile(r"^\s*\|(.+)\|\s*$")
+_TABLE_SEP_RE   = re.compile(r"^\s*\|[\s\-:|]+\|\s*$")
+_RECOMMEND_RE   = re.compile(
+    r"((?:💡\s*)?(?:Recommendation|I recommend|Best suited|I suggest)[^\n]*)",
+    re.IGNORECASE,
+)
+
+
+def _table_block_to_tree(text: str) -> str:
+    """Convert any markdown pipe-table block in text to tree format."""
+    lines   = text.splitlines()
+    out     = []
+    i       = 0
+    while i < len(lines):
+        line = lines[i]
+        # Detect start of a table block
+        if _TABLE_ROW_RE.match(line) and not _TABLE_SEP_RE.match(line):
+            # Collect the full table block
+            block = []
+            while i < len(lines) and (
+                _TABLE_ROW_RE.match(lines[i]) or _TABLE_SEP_RE.match(lines[i])
+            ):
+                block.append(lines[i])
+                i += 1
+
+            # Parse header + data rows
+            header = None
+            rows   = []
+            for bline in block:
+                if _TABLE_SEP_RE.match(bline):
+                    continue
+                cells = [c.strip() for c in bline.split("|") if c.strip()]
+                if not cells:
+                    continue
+                if header is None:
+                    header = cells
+                else:
+                    rows.append(cells)
+
+            # Emit tree format
+            for row in rows:
+                if not row:
+                    continue
+                out.append(row[0].upper())
+                for j, cell in enumerate(row[1:], start=1):
+                    label     = header[j] if header and j < len(header) else f"Col {j}"
+                    connector = "└─" if j == len(row) - 1 else "├─"
+                    out.append(f"{connector} {label}: {cell}")
+                out.append("---")
+        else:
+            out.append(line)
+            i += 1
+    return "\n".join(out)
+
+
+def post_process_answer(answer: str) -> str:
+    """
+    Post-process LLM output for consistent display:
+    1. Convert markdown pipe-tables → tree format
+    2. Wrap recommendation sentences → [RECOMMEND]...[/RECOMMEND]
+    3. Collapse excessive blank lines
+    4. Strip trailing whitespace per line
+    """
+    # 1. Convert markdown tables
+    answer = _table_block_to_tree(answer)
+
+    # 2. Wrap recommendation sentences
+    def _wrap(m: re.Match) -> str:
+        return f"[RECOMMEND]{m.group(1).strip()}[/RECOMMEND]"
+    answer = _RECOMMEND_RE.sub(_wrap, answer)
+
+    # 3. Collapse 3+ blank lines → 2
+    answer = re.sub(r"\n{3,}", "\n\n", answer)
+
+    # 4. Strip trailing spaces per line
+    answer = "\n".join(l.rstrip() for l in answer.splitlines())
+
+    return answer.strip()
+
+
 # ── GET / — serve the HTML chatbot frontend ────────────────────────────────────
 @app.route("/")
 def index():
@@ -272,24 +353,36 @@ def ask():
         if is_broad:
             prompt += """
 
-IMPORTANT: The user wants a complete overview. Structure your answer with these sections \
-(only include sections that have information in the context):
+IMPORTANT: The user wants a complete overview. Use ALL CAPS section names (not ## headers). \
+Only include sections that have data in the context. Format:
 
-## Programme Overview
-## Curriculum & Topics
-## Fees & Scholarships
-## Eligibility & Admissions
-## Career Outcomes
-## Learning Format
+PROGRAMME OVERVIEW:
+[3-5 bullet points]
+---
+CURRICULUM & TOPICS:
+[3-5 bullet points]
+---
+FEES & SCHOLARSHIPS:
+[key: value pairs]
+---
+ELIGIBILITY & ADMISSIONS:
+[3-5 bullet points]
+---
+CAREER OUTCOMES:
+[key: value pairs]
+---
+LEARNING FORMAT:
+[3-5 bullet points]
 
-Keep each section concise — 3 to 5 bullet points. \
-If a section has no data in context, skip it entirely. Do not invent anything."""
+Skip any section with no data in context. Do not invent anything."""
 
         # ── 5. Call LLM ────────────────────────────────────────────────────
         response = _pipeline.llm.invoke(prompt)
         answer   = getattr(response, "content", str(response))
         # Strip chain-of-thought tags (Qwen3 local model adds these)
         answer   = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
+        # Post-process for clean, consistently formatted output
+        answer   = post_process_answer(answer)
 
         if not answer:
             answer = "I couldn't generate a response. Please try rephrasing your question."

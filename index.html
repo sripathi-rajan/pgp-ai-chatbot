@@ -238,6 +238,76 @@
             border: 1px solid rgba(255, 255, 255, 0.05);
             pointer-events: auto;
         }
+
+        /* ── Chat message formatting classes ─────────────────────────── */
+        .chat-number {
+            color: #f7d08a;
+            font-weight: 700;
+        }
+
+        .chat-label {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+
+        .chat-value {
+            color: white;
+            font-weight: 600;
+        }
+
+        .chat-section {
+            color: #3b82f6;
+            font-weight: 800;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            border-left: 2px solid #3b82f6;
+            padding-left: 10px;
+            margin-top: 16px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .chat-tree {
+            font-family: monospace;
+            color: #0fb881;
+            font-size: 12px;
+            margin-left: 12px;
+            line-height: 1.8;
+            display: block;
+        }
+
+        .chat-divider {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            margin: 12px 0;
+        }
+
+        .chat-recommend {
+            background: rgba(15, 184, 129, 0.08);
+            border: 1px solid rgba(15, 184, 129, 0.2);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-top: 16px;
+            font-size: 12px;
+            color: #0fb881;
+            display: block;
+        }
+
+        .chat-prog-name {
+            color: #60a5fa;
+            font-weight: 800;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            border-left: 2px solid #3b82f6;
+            padding-left: 10px;
+            margin-top: 14px;
+            margin-bottom: 4px;
+            display: block;
+        }
     </style>
 </head>
 
@@ -452,7 +522,53 @@
             return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
 
+        // Detect ALL-CAPS section headers (e.g. "FEES:", "ELIGIBILITY & ADMISSIONS:")
+        function isAllCapsHeader(raw) {
+            const t = raw.trim();
+            if (t.length < 4) return false;
+            // Must contain at least one letter, and all letters must be uppercase
+            if (!/[A-Z]/.test(t)) return false;
+            if (/[a-z]/.test(t)) return false;
+            // Allow letters, digits, spaces, &, /, -, (, ), ', :, .
+            return /^[A-Z0-9\s&'\/\(\)\-:,\.─├└]{4,}$/.test(t);
+        }
+
+        // Detect tree lines: ├─  └─  │
+        function isTreeLine(raw) {
+            return /^[\s]*[├└│]/.test(raw);
+        }
+
+        // Detect programme name lines (ALL CAPS, no colon, not a section separator)
+        function isProgName(raw) {
+            const t = raw.trim();
+            return isAllCapsHeader(t) && !t.endsWith(':') && !/^[-=─]+$/.test(t) && t.length > 6;
+        }
+
+        // Detect key: value lines  (e.g. "Fee: ₹22,65,000"  "Duration: 12 months")
+        function isKeyValue(raw) {
+            return /^[A-Za-z][A-Za-z\s\/&]{1,25}:\s+\S/.test(raw.trim())
+                && !/^[-*#]/.test(raw.trim())
+                && !/^\d+\./.test(raw.trim());
+        }
+
+        // Inline formatters applied after HTML-escape
+        function applyInline(line) {
+            // Bold
+            line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Inline code
+            line = line.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;font-size:0.85em">$1</code>');
+            // Highlight ₹ amounts in gold
+            line = line.replace(/(₹[\d,\.]+(?:\s*(?:lakh|lakhs|L|LPA|Cr))?)/gi,
+                '<span class="chat-number">$1</span>');
+            return line;
+        }
+
         function renderMarkdown(text) {
+            // Pre-pass: unwrap [RECOMMEND]...[/RECOMMEND] blocks before line splitting
+            // (they may be inline within a line)
+            text = text.replace(/\[RECOMMEND\]([\s\S]*?)\[\/RECOMMEND\]/g,
+                (_, inner) => `\x00RECOMMEND\x00${inner.trim()}\x00ENDRECOMMEND\x00`);
+
             const lines = text.split('\n');
             let html = '';
             let inUL = false, inOL = false;
@@ -463,53 +579,107 @@
             }
 
             lines.forEach(rawLine => {
+                // ── [RECOMMEND] block ─────────────────────────────────────
+                if (rawLine.includes('\x00RECOMMEND\x00')) {
+                    closeList();
+                    const inner = rawLine
+                        .replace('\x00RECOMMEND\x00', '')
+                        .replace('\x00ENDRECOMMEND\x00', '');
+                    html += `<span class="chat-recommend">${applyInline(escapeHtml(inner))}</span>`;
+                    return;
+                }
+
                 // 1. HTML-escape first to prevent XSS
                 let line = escapeHtml(rawLine);
-                // 2. Then apply markdown transforms (safe — only affects ** and `)
-                line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                line = line.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;font-size:0.85em">$1</code>');
+                // 2. Apply inline transforms
+                line = applyInline(line);
 
-                // Indented sub-bullet MUST come before regular bullet
-                if (/^\s{2,}[-*]\s+(.+)/.test(rawLine)) {
-                    if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
-                    html += `<li style="padding-left:20px;opacity:0.85">${line.replace(/^\s+[-*]\s+/, '')}</li>`;
+                // ── Tree lines  ├─  └─ ────────────────────────────────────
+                if (isTreeLine(rawLine)) {
+                    closeList();
+                    html += `<span class="chat-tree">${line}</span>`;
+                    return;
                 }
-                // Headings
-                else if (/^###\s+/.test(rawLine)) {
+
+                // ── Horizontal rule  ---  or  === ─────────────────────────
+                if (/^[-=]{3,}$/.test(rawLine.trim())) {
                     closeList();
-                    html += `<p style="font-size:0.8em;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;opacity:0.6;margin:12px 0 4px">${line.replace(/^###\s+/, '')}</p>`;
-                } else if (/^##\s+/.test(rawLine)) {
+                    html += '<hr class="chat-divider">';
+                    return;
+                }
+
+                // ── Markdown headings  ## / ### ───────────────────────────
+                if (/^###\s+/.test(rawLine)) {
                     closeList();
-                    html += `<p style="font-size:0.9em;font-weight:800;margin:14px 0 4px">${line.replace(/^##\s+/, '')}</p>`;
-                } else if (/^#\s+/.test(rawLine)) {
+                    html += `<span class="chat-section">${line.replace(/^###\s+/, '')}</span>`;
+                    return;
+                }
+                if (/^##\s+/.test(rawLine)) {
+                    closeList();
+                    html += `<span class="chat-section">${line.replace(/^##\s+/, '')}</span>`;
+                    return;
+                }
+                if (/^#\s+/.test(rawLine)) {
                     closeList();
                     html += `<p style="font-size:1em;font-weight:900;margin:14px 0 4px">${line.replace(/^#\s+/, '')}</p>`;
+                    return;
                 }
-                // Numbered list
-                else if (/^\d+\.\s+/.test(rawLine)) {
+
+                // ── ALL CAPS programme name (no colon) ────────────────────
+                if (isProgName(rawLine)) {
+                    closeList();
+                    html += `<span class="chat-prog-name">${line}</span>`;
+                    return;
+                }
+
+                // ── ALL CAPS section header (ends with colon) ─────────────
+                if (isAllCapsHeader(rawLine) && rawLine.trim().endsWith(':')) {
+                    closeList();
+                    html += `<span class="chat-section">${line}</span>`;
+                    return;
+                }
+
+                // ── Indented sub-bullet ───────────────────────────────────
+                if (/^\s{2,}[-*]\s+/.test(rawLine)) {
+                    if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
+                    html += `<li style="padding-left:20px;opacity:0.85">${line.replace(/^\s+[-*]\s+/, '')}</li>`;
+                    return;
+                }
+
+                // ── Numbered list ─────────────────────────────────────────
+                if (/^\d+\.\s+/.test(rawLine)) {
                     if (!inOL) { closeList(); html += '<ol style="margin:6px 0 6px 18px;list-style:decimal;display:flex;flex-direction:column;gap:4px">'; inOL = true; }
                     html += `<li style="padding-left:4px">${line.replace(/^\d+\.\s+/, '')}</li>`;
+                    return;
                 }
-                // Bullet list
-                else if (/^[-*]\s+/.test(rawLine)) {
+
+                // ── Bullet list ───────────────────────────────────────────
+                if (/^[-*]\s+/.test(rawLine)) {
                     if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
                     html += `<li style="padding-left:4px">${line.replace(/^[-*]\s+/, '')}</li>`;
+                    return;
                 }
-                // Horizontal rule
-                else if (/^---+$/.test(rawLine.trim())) {
+
+                // ── Key: Value pair ───────────────────────────────────────
+                if (isKeyValue(rawLine)) {
                     closeList();
-                    html += '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:10px 0">';
+                    const colon = rawLine.indexOf(':');
+                    const label = escapeHtml(rawLine.slice(0, colon).trim());
+                    const value = applyInline(escapeHtml(rawLine.slice(colon + 1).trim()));
+                    html += `<p style="margin:3px 0"><span class="chat-label">${label}:</span> <span class="chat-value">${value}</span></p>`;
+                    return;
                 }
-                // Empty line
-                else if (rawLine.trim() === '') {
+
+                // ── Empty line ────────────────────────────────────────────
+                if (rawLine.trim() === '') {
                     closeList();
                     html += '<div style="height:6px"></div>';
+                    return;
                 }
-                // Normal paragraph
-                else {
-                    closeList();
-                    html += `<p style="margin:3px 0">${line}</p>`;
-                }
+
+                // ── Normal paragraph ──────────────────────────────────────
+                closeList();
+                html += `<p style="margin:3px 0;line-height:1.7">${line}</p>`;
             });
 
             closeList();
@@ -523,7 +693,7 @@
             const div = document.createElement('div');
             div.className = role === 'user'
                 ? "bg-blue-600 text-white p-5 rounded-2xl text-sm leading-relaxed max-w-[85%] self-end ml-auto"
-                : "bg-white/5 border border-white/10 p-5 rounded-2xl text-sm leading-relaxed max-w-[90%]";
+                : "bg-white/5 border border-white/10 p-6 rounded-2xl text-sm leading-7 max-w-[90%]";
 
             let html = '';
             if (category) {
