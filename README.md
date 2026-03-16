@@ -5,7 +5,7 @@ A chatbot that answers questions about Masters' Union programmes — fees, admis
 ## What it does
 
 - Understands questions about **28 programmes** (UG, PGP, Executive, Family Business, Immersion)
-- Answers from real programme data using AI (Groq LLaMA by default)
+- Answers from real programme data using AI (Groq LLaMA)
 - Handles follow-up questions with conversation history
 - Rejects off-topic queries (cricket scores, weather, jokes, etc.)
 
@@ -17,7 +17,7 @@ A chatbot that answers questions about Masters' Union programmes — fees, admis
 pip install -r requirements.txt
 ```
 
-### Step 2 — Add your API key
+### Step 2 — Add your Groq API key
 
 On **Mac/Linux**:
 ```bash
@@ -29,7 +29,7 @@ On **Windows**:
 set GROQ_API_KEY=gsk_your_key_here
 ```
 
-> Get a free Groq key at console.groq.com. If you have an OpenAI key, set `OPENAI_API_KEY` instead.
+> Get a free Groq key at console.groq.com
 
 ### Step 3 — Index the data
 
@@ -105,32 +105,14 @@ pgp-ai-chatbot/
 
 ---
 
-## Configuration
-
-| Variable | What it does |
-|---|---|
-| `GROQ_API_KEY` | Groq API key — used by default |
-| `OPENAI_API_KEY` | OpenAI fallback if no Groq key |
-| `USE_LOCAL_LLM=true` | Use a local Ollama model instead |
-
----
-
 ## API Key Safety
 
-- Your API key is **never sent to the browser** — it stays on the server only.
+- Your Groq API key is **never sent to the browser** — it stays on the server only.
 - Other users **cannot read your key**, but if your server is publicly accessible they can send requests that use your quota.
 - For local use on your own machine, you are completely safe.
 
 ---
 
-## Streamlit (alternative UI)
-
-```bash
-streamlit run streamlit_app.py
-```
-
----
-
 ## Version
 
-**v1.0.0** — Flask server, hybrid RAG retrieval, Groq LLaMA, 28 programmes, ~1452 indexed chunks.
+**v1.0.0** — Flask server, hybrid RAG retrieval, Groq LLaMA 3.1 8B, 28 programmes, ~1452 indexed chunks.
