@@ -6,19 +6,15 @@ langchain>=0.3.0
 langchain-community
 langchain-huggingface
 langchain-openai
+langchain-ollama
 langchain-text-splitters
 faiss-cpu
-# chromadb
 sentence-transformers
 rank-bm25
 scikit-learn
 numpy
-pymupdf
-pypdf
 pdfplumber
 beautifulsoup4
 requests
-playwright
 transformers
 torch
-accelerate

@@ -117,6 +117,59 @@ _BROAD_TRIGGERS = [
     "what does this program offer", "full details", "complete information",
 ]
 
+# ── Course-list query triggers (always inject the programme list first) ────────
+_COURSE_LIST_TRIGGERS = [
+    "list all", "all courses", "all programmes", "all programs",
+    "what courses", "what programmes", "what programs",
+    "available courses", "available programmes", "available programs",
+    "course list", "programme list", "program list",
+    "courses offered", "programmes offered", "programs offered",
+    "list of courses", "list of programmes", "list of programs",
+    "what can i study", "what do you offer",
+    "undergraduate programme", "undergraduate program",
+    "postgraduate programme", "postgraduate program",
+    "ug programme", "pg programme", "pgp programme",
+    "which programmes", "which programs", "which courses",
+]
+
+# ── Programme catalogue injected as guaranteed first chunk ────────────────────
+_PROGRAMME_CATALOGUE = """MASTERS' UNION — COMPLETE LIST OF ALL PROGRAMMES OFFERED
+
+UNDERGRADUATE PROGRAMMES:
+- UG in Technology & Business Management
+- UG in Psychology & Marketing
+- UG in Data Science & AI
+- UG in Finance & Economics
+- UG Programme in Design (MUDS)
+- UG in Technology & Business Management (Illinois Tech, US)
+- UG in Psychology & Marketing (Illinois Tech, US)
+- UG in Data Science & AI (Illinois Tech, US)
+- UG in Technology & Business Management (Griffith University, Australia)
+
+POSTGRADUATE PROGRAMMES (PGP):
+- PGP in Technology & Business Management
+- PGP in Technology & Business Management (Young Leaders Cohort)
+- PGP in Human Resources & Organisation Strategy
+- PGP in Sports Management & Gaming
+- PGP in Applied AI & Agentic Systems
+- PGP in UI/UX & AI Product Design
+- PGP in Sustainability & Business Management
+
+EXECUTIVE PROGRAMMES:
+- PGP Rise: General Management
+- PGP in Capital Markets and Trading
+- PGP in Entrepreneurship and Business Acceleration
+- PGP Rise: General Management (Global)
+- Bloomberg Equity Research Programme
+
+FAMILY BUSINESS PROGRAMMES:
+- PGP Rise: Owners and Promoters Management
+- PGP in Entrepreneurship and Business Acceleration
+
+IMMERSION PROGRAMMES:
+- PGP Bharat
+- Bharat Fellowship"""
+
 # ── Input sanitisation ─────────────────────────────────────────────────────────
 _MAX_QUERY_LEN = 500
 _INJECTION_RE = re.compile(
@@ -150,8 +203,12 @@ def ask():
                "model": "model name string" }
     """
     try:
-        data  = request.get_json(force=True) or {}
-        query = _sanitize(data.get("query", ""))
+        data    = request.get_json(force=True) or {}
+        query   = _sanitize(data.get("query", ""))
+        history = data.get("history", [])
+        # Validate history: must be list of [role, message] pairs
+        if not isinstance(history, list):
+            history = []
 
         if not query:
             return jsonify({
@@ -179,9 +236,13 @@ def ask():
         # ── 1. Classify intent (keyword-first, LLM fallback on ambiguity) ─
         intent, _ = detect_intent(query, llm=_pipeline.llm)
 
-        # ── 2. Retrieve relevant chunks ────────────────────────────────────
-        is_broad = any(w in query.lower() for w in _BROAD_TRIGGERS)
-        if is_broad:
+        # ── 2. Detect course-list queries ──────────────────────────────────
+        q_lower = query.lower()
+        is_course_list = any(t in q_lower for t in _COURSE_LIST_TRIGGERS)
+
+        # ── 3. Retrieve relevant chunks ────────────────────────────────────
+        is_broad = any(w in q_lower for w in _BROAD_TRIGGERS)
+        if is_broad or is_course_list:
             top_docs = broad_retrieve(
                 query, _pipeline.db, _pipeline.bm25,
                 _pipeline.texts, _pipeline.embeddings, chunks_per_topic=2
@@ -189,14 +250,24 @@ def ask():
         else:
             top_docs = hybrid_retrieve(
                 query, _pipeline.db, _pipeline.bm25,
-                _pipeline.texts, _pipeline.embeddings, k=5
+                _pipeline.texts, _pipeline.embeddings, k=8,
+                chunks=_pipeline.chunks
             )
 
-        # ── 3. Build context string ────────────────────────────────────────
+        # ── 4. For course-list queries inject the catalogue as first chunk ─
+        if is_course_list:
+            from langchain_core.documents import Document as _Doc
+            catalogue_doc = _Doc(
+                page_content=_PROGRAMME_CATALOGUE,
+                metadata={"source": "programme_catalogue", "content_type": "catalogue"}
+            )
+            top_docs = [catalogue_doc] + list(top_docs)
+
+        # ── 5. Build context string ────────────────────────────────────────
         context = format_context(top_docs)
 
-        # ── 4. Build prompt ────────────────────────────────────────────────
-        prompt = build_prompt(query, context, [], intent=intent)
+        # ── 6. Build prompt ────────────────────────────────────────────────
+        prompt = build_prompt(query, context, history, intent=intent)
 
         if is_broad:
             prompt += """

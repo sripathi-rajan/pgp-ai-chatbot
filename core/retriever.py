@@ -5,6 +5,7 @@ from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 
 QUERY_EXPANSIONS = {
+    # Eligibility expansions
     "manager":           "working professional experience eligibility",
     "non-tech":          "non-technical background STEM eligibility criteria",
     "non technical":     "non-technical background STEM eligibility criteria",
@@ -15,6 +16,22 @@ QUERY_EXPANSIONS = {
     "worth it":          "career outcomes placement salary benefits",
     "good program":      "program overview benefits outcomes rankings",
     "suitable for me":   "eligibility criteria target participants",
+    # Fee expansions — map common programme abbreviations to fee keywords
+    "pgp tbm":           "PGP Technology Business Management fee tuition cost ₹",
+    "pgp fee":           "programme fee tuition cost ₹ scholarship installment",
+    "ug fee":            "undergraduate fee tuition cost ₹ scholarship",
+    "executive":         "executive programme fee PGP Rise cost ₹",
+    "capital markets":   "PGP Capital Markets Trading fee cost ₹",
+    "applied ai":        "PGP Applied AI Agentic Systems fee cost ₹",
+    "ui ux":             "PGP UI UX AI Product Design fee cost ₹",
+    "sustainability":    "PGP Sustainability Business Management fee ₹",
+    "sports":            "PGP Sports Management Gaming fee cost ₹",
+    # Placement / salary expansions
+    "average salary":    "average CTC LPA placement salary median highest",
+    "placement":         "placement salary CTC LPA hiring companies recruiters",
+    # Immersion expansions
+    "immersion":         "global immersion international trip university abroad",
+    "global":            "global immersion international exposure overseas university",
 }
 
 def expand_query(query: str) -> str:
@@ -27,22 +44,52 @@ def expand_query(query: str) -> str:
         return query + " " + " ".join(expansions)
     return query
 
-def hybrid_retrieve(query, db, bm25, texts, embeddings, k=5):
+def hybrid_retrieve(query, db, bm25, texts, embeddings, k=8, chunks=None):
+    """
+    Hybrid MMR + BM25 retrieval.
+    Returns a list of LangChain Document objects (preserving metadata).
+    Falls back to plain strings when chunks lookup is unavailable.
+    """
     query = expand_query(query)
-    semantic_results = db.similarity_search_with_relevance_scores(query, k=k*2)
-    semantic_docs = [r[0].page_content for r in semantic_results]
 
+    # ── Semantic: MMR avoids returning near-duplicate chunks ─────────────────
+    try:
+        mmr_docs = db.max_marginal_relevance_search(query, k=k, fetch_k=k * 3)
+    except Exception:
+        # Fallback if MMR is not supported by this FAISS build
+        mmr_docs = [r[0] for r in db.similarity_search_with_relevance_scores(query, k=k * 2)]
+
+    # ── BM25 keyword search — returns indices into texts list ─────────────────
     tokens = query.lower().split()
-    bm25_scores = bm25.get_scores(tokens)
-    bm25_top_idx = np.argsort(bm25_scores)[::-1][:k*2]
-    bm25_docs = [texts[i] for i in bm25_top_idx]
+    bm25_scores  = bm25.get_scores(tokens)
+    bm25_top_idx = np.argsort(bm25_scores)[::-1][: k * 2]
 
-    # Ordered dedup merge: semantic results take priority, BM25 fills remaining slots
-    seen = set()
-    merged = []
-    for doc in semantic_docs + bm25_docs:
-        if doc not in seen:
-            seen.add(doc)
+    # Build text→Document lookup for BM25 results (if chunks provided)
+    text_to_doc: dict = {}
+    if chunks is not None:
+        for c in chunks:
+            text_to_doc[c.page_content] = c
+
+    bm25_docs = []
+    for i in bm25_top_idx:
+        txt = texts[i]
+        if txt in text_to_doc:
+            bm25_docs.append(text_to_doc[txt])
+        else:
+            # Wrap bare string so downstream format_context works uniformly
+            from langchain_core.documents import Document as _Doc
+            bm25_docs.append(_Doc(page_content=txt, metadata={}))
+
+    # ── Ordered dedup merge: MMR results take priority, BM25 fills gaps ───────
+    seen: set = set()
+    merged: list = []
+    for doc in mmr_docs + bm25_docs:
+        content = doc.page_content if hasattr(doc, "page_content") else str(doc)
+        # Filter out very short / noisy chunks
+        if len(content.strip()) < 100:
+            continue
+        if content not in seen:
+            seen.add(content)
             merged.append(doc)
         if len(merged) >= k:
             break
@@ -50,26 +97,28 @@ def hybrid_retrieve(query, db, bm25, texts, embeddings, k=5):
 
 def broad_retrieve(query, db, bm25, texts, embeddings, chunks_per_topic=2):
     """
-    For broad/overview queries — fetch chunks across all topic areas
-    instead of just the top-k most similar.
+    For broad/overview queries — fetch chunks across all topic areas.
+    Returns Document objects (preserving metadata for format_context).
     """
     topic_queries = [
+        "list all programmes courses available undergraduate postgraduate executive",
         "program fee cost scholarship installment",
         "curriculum topics modules terms syllabus",
         "eligibility admission criteria apply selection",
         "career placement salary companies hiring",
         "faculty mentor professor instructor",
         "program duration format online offline schedule",
+        "global immersion international study abroad",
     ]
-    seen = set()
-    all_docs = []
+    seen: set = set()
+    all_docs: list = []
     for topic_query in topic_queries:
         try:
             results = db.similarity_search(topic_query, k=chunks_per_topic)
             for doc in results:
-                if doc.page_content not in seen:
+                if doc.page_content not in seen and len(doc.page_content.strip()) >= 100:
                     seen.add(doc.page_content)
-                    all_docs.append(doc.page_content)
+                    all_docs.append(doc)
         except Exception as e:
             print(f"[BROAD] Topic query failed: {e}")
     return all_docs

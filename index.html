@@ -411,6 +411,9 @@
             }
         };
 
+        // Maintain conversation history for multi-turn context
+        const _chatHistory = [];
+
         window.sendMessage = async function () {
             const chatMessages = document.getElementById('chat-messages');
             const chatInput = document.getElementById('chat-input');
@@ -429,17 +432,25 @@
                 const res = await fetch('http://localhost:5000/ask', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query })
+                    body: JSON.stringify({ query, history: _chatHistory })
                 });
                 const data = await res.json();
                 typing.classList.add('hidden');
-                addMessage(data.answer || "No response received", 'bot', data.category, data.model);
+                const answer = data.answer || "No response received";
+                // Track history (last 6 turns)
+                _chatHistory.push(["user", query], ["assistant", answer]);
+                if (_chatHistory.length > 12) _chatHistory.splice(0, 2);
+                addMessage(answer, 'bot', data.category, data.model);
             } catch (e) {
                 console.error("Chat Error:", e);
                 typing.classList.add('hidden');
-                addMessage("⚠️ Could not connect to the server. Please make sure the Flask server is running: <code>python app.py</code>", 'bot');
+                addMessage("⚠️ Could not connect to the server. Please make sure the Flask server is running: python app.py", 'bot');
             }
         };
+
+        function escapeHtml(str) {
+            return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
 
         function renderMarkdown(text) {
             const lines = text.split('\n');
@@ -451,45 +462,46 @@
                 if (inOL) { html += '</ol>'; inOL = false; }
             }
 
-            lines.forEach(line => {
-                // Bold
+            lines.forEach(rawLine => {
+                // 1. HTML-escape first to prevent XSS
+                let line = escapeHtml(rawLine);
+                // 2. Then apply markdown transforms (safe — only affects ** and `)
                 line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                // Inline code
                 line = line.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;font-size:0.85em">$1</code>');
 
-                // Heading ##
-                if (/^###\s+(.+)/.test(line)) {
+                // Indented sub-bullet MUST come before regular bullet
+                if (/^\s{2,}[-*]\s+(.+)/.test(rawLine)) {
+                    if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
+                    html += `<li style="padding-left:20px;opacity:0.85">${line.replace(/^\s+[-*]\s+/, '')}</li>`;
+                }
+                // Headings
+                else if (/^###\s+/.test(rawLine)) {
                     closeList();
                     html += `<p style="font-size:0.8em;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;opacity:0.6;margin:12px 0 4px">${line.replace(/^###\s+/, '')}</p>`;
-                } else if (/^##\s+(.+)/.test(line)) {
+                } else if (/^##\s+/.test(rawLine)) {
                     closeList();
                     html += `<p style="font-size:0.9em;font-weight:800;margin:14px 0 4px">${line.replace(/^##\s+/, '')}</p>`;
-                } else if (/^#\s+(.+)/.test(line)) {
+                } else if (/^#\s+/.test(rawLine)) {
                     closeList();
                     html += `<p style="font-size:1em;font-weight:900;margin:14px 0 4px">${line.replace(/^#\s+/, '')}</p>`;
                 }
                 // Numbered list
-                else if (/^\d+\.\s+(.+)/.test(line)) {
+                else if (/^\d+\.\s+/.test(rawLine)) {
                     if (!inOL) { closeList(); html += '<ol style="margin:6px 0 6px 18px;list-style:decimal;display:flex;flex-direction:column;gap:4px">'; inOL = true; }
                     html += `<li style="padding-left:4px">${line.replace(/^\d+\.\s+/, '')}</li>`;
                 }
-                // Bullet list (- or *)
-                else if (/^[-*]\s+(.+)/.test(line)) {
+                // Bullet list
+                else if (/^[-*]\s+/.test(rawLine)) {
                     if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
                     html += `<li style="padding-left:4px">${line.replace(/^[-*]\s+/, '')}</li>`;
                 }
-                // Indented sub-bullet (  - or  *)
-                else if (/^\s{2,}[-*]\s+(.+)/.test(line)) {
-                    if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
-                    html += `<li style="padding-left:12px;opacity:0.85">${line.replace(/^\s+[-*]\s+/, '')}</li>`;
-                }
                 // Horizontal rule
-                else if (/^---+$/.test(line.trim())) {
+                else if (/^---+$/.test(rawLine.trim())) {
                     closeList();
                     html += '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:10px 0">';
                 }
                 // Empty line
-                else if (line.trim() === '') {
+                else if (rawLine.trim() === '') {
                     closeList();
                     html += '<div style="height:6px"></div>';
                 }

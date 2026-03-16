@@ -26,6 +26,22 @@ class Pipeline:
     llm: Any
 
 
+def _get_content_type(filename: str) -> str:
+    """Infer a content_type tag from the filename for better retrieval filtering."""
+    f = filename.lower()
+    if "placement" in f:
+        return "placement"
+    if "brochure" in f:
+        return "brochure"
+    if "curriculum" in f:
+        return "curriculum"
+    if "fee" in f or "admission" in f:
+        return "admissions"
+    if "immersion" in f or "gip" in f:
+        return "immersion"
+    return "general"
+
+
 def clean_chunk_text(text: str) -> str:
     """Fix common PDF extraction issues: missing spaces, garbled runs, broken hyphens."""
     text = re.sub(r'([a-z])([A-Z])', r'\1 \2', text)   # camelCase → camel Case
@@ -78,7 +94,12 @@ def load_scraped_data(raw_dir="data/raw"):
             course_name = first_line.replace("COURSE:", "").strip() if "COURSE:" in first_line else file.stem
             documents.append(Document(
                 page_content=text,
-                metadata={"source": str(file), "course": course_name, "page": file.stem}
+                metadata={
+                    "source":       str(file),
+                    "course":       course_name,
+                    "page":         file.stem,
+                    "content_type": _get_content_type(file.name),
+                }
             ))
             print(f"[SCRAPER] Loaded {file.name} ({len(text):,} chars)")
         except Exception as e:
@@ -106,11 +127,11 @@ def ingest_pdf_data(raw_dir: str = "data/raw") -> list:
         print("[PDF-INGEST] data/raw/ not found — run scripts/ingest_pdfs.py first")
         return []
 
-    # ~400 words ≈ 2 400 chars; 50-word overlap ≈ 300 chars
+    # ~600 words ≈ 3 600 chars; 100-word overlap ≈ 600 chars
     pdf_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=2400,
-        chunk_overlap=300,
-        separators=["\n\n", "\n", ".", "!", "?", ",", " "],
+        chunk_size=3600,
+        chunk_overlap=600,
+        separators=["\n\n", "\n", ". ", " "],
     )
 
     documents = []
@@ -147,11 +168,12 @@ def ingest_pdf_data(raw_dir: str = "data/raw") -> list:
                 documents.append(Document(
                     page_content=cleaned,
                     metadata={
-                        "source":   filename,
-                        "category": category,
-                        "page":     page_num,
-                        "type":     "pdf",
-                        "chunk_id": chunk_id,
+                        "source":       filename,
+                        "category":     category,
+                        "page":         page_num,
+                        "type":         "pdf",
+                        "chunk_id":     chunk_id,
+                        "content_type": _get_content_type(filename),
                     },
                 ))
 
@@ -190,9 +212,9 @@ def load_pipeline():
     )
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        separators=["\n\n", "\n", ".", "!", "?", ",", " "]
+        chunk_size=3600,
+        chunk_overlap=600,
+        separators=["\n\n", "\n", ". ", " "]
     )
     chunks = splitter.split_documents(all_docs)
     for c in chunks:
@@ -205,11 +227,15 @@ def load_pipeline():
     )
     FAISS_INDEX_PATH = "./faiss_index"
 
-    # Rebuild index if program_data.txt is newer than the saved index
+    # Rebuild index if any source data is newer than the saved index
     if os.path.exists(FAISS_INDEX_PATH):
         index_mtime = os.path.getmtime(FAISS_INDEX_PATH)
-        data_mtime = os.path.getmtime("data/program_data.txt") if os.path.exists("data/program_data.txt") else 0
-        if data_mtime > index_mtime:
+        data_files  = ["data/program_data.txt", "data/brochure.pdf"]
+        latest_data = max(
+            (os.path.getmtime(f) for f in data_files if os.path.exists(f)),
+            default=0,
+        )
+        if latest_data > index_mtime:
             shutil.rmtree(FAISS_INDEX_PATH)
             print("[FAISS] Source data newer than index — rebuilding")
 
@@ -307,9 +333,9 @@ def load_pipeline_flask():
     )
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        separators=["\n\n", "\n", ".", "!", "?", ",", " "]
+        chunk_size=3600,
+        chunk_overlap=600,
+        separators=["\n\n", "\n", ". ", " "]
     )
     chunks = splitter.split_documents(all_docs)
     for c in chunks:
@@ -322,11 +348,15 @@ def load_pipeline_flask():
     )
     FAISS_INDEX_PATH = "./faiss_index"
 
-    # Rebuild index if program_data.txt is newer than the saved index
+    # Rebuild index if any source data is newer than the saved index
     if os.path.exists(FAISS_INDEX_PATH):
         index_mtime = os.path.getmtime(FAISS_INDEX_PATH)
-        data_mtime = os.path.getmtime("data/program_data.txt") if os.path.exists("data/program_data.txt") else 0
-        if data_mtime > index_mtime:
+        data_files  = ["data/program_data.txt", "data/brochure.pdf"]
+        latest_data = max(
+            (os.path.getmtime(f) for f in data_files if os.path.exists(f)),
+            default=0,
+        )
+        if latest_data > index_mtime:
             shutil.rmtree(FAISS_INDEX_PATH)
             print("[FAISS] Source data newer than index — rebuilding")
 
