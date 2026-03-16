@@ -52,7 +52,10 @@ STRICT RULES:
 - If the query asks to compare or recommend: compare ALL relevant programs from context, mention fees, duration, and suitability.
 - If the query asks for a list: provide the complete list, do not truncate.
 - Never invent facts, numbers, dates, or names.
-- Format fees with ₹ symbol. Use bullet points where appropriate.
+- Format fees with ₹ symbol. Always use markdown bullet points (`- item`) for lists and fee breakdowns.
+- For fee tables, use nested bullets: top-level category, then `  - sub-item: ₹amount` indented with 2 spaces.
+- Use `**bold**` for section headers and total amounts.
+- Never dump fees as one long paragraph — always break them into a bulleted list.
 - Adapt your answer length and format to what the question actually needs.
 
 CONTEXT:

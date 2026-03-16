@@ -441,6 +441,69 @@
             }
         };
 
+        function renderMarkdown(text) {
+            const lines = text.split('\n');
+            let html = '';
+            let inUL = false, inOL = false;
+
+            function closeList() {
+                if (inUL) { html += '</ul>'; inUL = false; }
+                if (inOL) { html += '</ol>'; inOL = false; }
+            }
+
+            lines.forEach(line => {
+                // Bold
+                line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                // Inline code
+                line = line.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:4px;font-size:0.85em">$1</code>');
+
+                // Heading ##
+                if (/^###\s+(.+)/.test(line)) {
+                    closeList();
+                    html += `<p style="font-size:0.8em;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;opacity:0.6;margin:12px 0 4px">${line.replace(/^###\s+/, '')}</p>`;
+                } else if (/^##\s+(.+)/.test(line)) {
+                    closeList();
+                    html += `<p style="font-size:0.9em;font-weight:800;margin:14px 0 4px">${line.replace(/^##\s+/, '')}</p>`;
+                } else if (/^#\s+(.+)/.test(line)) {
+                    closeList();
+                    html += `<p style="font-size:1em;font-weight:900;margin:14px 0 4px">${line.replace(/^#\s+/, '')}</p>`;
+                }
+                // Numbered list
+                else if (/^\d+\.\s+(.+)/.test(line)) {
+                    if (!inOL) { closeList(); html += '<ol style="margin:6px 0 6px 18px;list-style:decimal;display:flex;flex-direction:column;gap:4px">'; inOL = true; }
+                    html += `<li style="padding-left:4px">${line.replace(/^\d+\.\s+/, '')}</li>`;
+                }
+                // Bullet list (- or *)
+                else if (/^[-*]\s+(.+)/.test(line)) {
+                    if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
+                    html += `<li style="padding-left:4px">${line.replace(/^[-*]\s+/, '')}</li>`;
+                }
+                // Indented sub-bullet (  - or  *)
+                else if (/^\s{2,}[-*]\s+(.+)/.test(line)) {
+                    if (!inUL) { closeList(); html += '<ul style="margin:6px 0 6px 16px;list-style:disc;display:flex;flex-direction:column;gap:4px">'; inUL = true; }
+                    html += `<li style="padding-left:12px;opacity:0.85">${line.replace(/^\s+[-*]\s+/, '')}</li>`;
+                }
+                // Horizontal rule
+                else if (/^---+$/.test(line.trim())) {
+                    closeList();
+                    html += '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:10px 0">';
+                }
+                // Empty line
+                else if (line.trim() === '') {
+                    closeList();
+                    html += '<div style="height:6px"></div>';
+                }
+                // Normal paragraph
+                else {
+                    closeList();
+                    html += `<p style="margin:3px 0">${line}</p>`;
+                }
+            });
+
+            closeList();
+            return html;
+        }
+
         function addMessage(text, role, category = '', model = '') {
             const chatMessages = document.getElementById('chat-messages');
             if (!chatMessages) return;
@@ -455,7 +518,7 @@
                 const colors = { 'Fees': '#f59e0b', 'Curriculum': '#3b82f6', 'Admissions': '#10b981', 'Career': '#8b5cf6', 'Overview': '#ec4899' };
                 html += `<span class="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded inline-block mb-3" style="background:${colors[category] || '#64748b'}">${category}</span><br>`;
             }
-            html += text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            html += renderMarkdown(text);
             if (model) html += `<div class="text-[8px] opacity-30 mt-4 text-right uppercase tracking-widest">Powered by ${model}</div>`;
 
             div.innerHTML = html;
