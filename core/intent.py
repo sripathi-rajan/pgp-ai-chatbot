@@ -49,9 +49,12 @@ CONFIDENCE: <score>"""
     text = getattr(response, "content", "").strip()
     intent_line = next((l for l in text.splitlines() if "INTENT:" in l), "")
     conf_line   = next((l for l in text.splitlines() if "CONFIDENCE:" in l), "")
-    intent     = intent_line.split("INTENT:")[-1].strip()
-    confidence = float(conf_line.split("CONFIDENCE:")[-1].strip())
-    intent = EMOJI_MAP.get(intent, f"❓ {intent}")
+    intent_raw  = intent_line.split("INTENT:")[-1].strip()
+    conf_raw    = conf_line.split("CONFIDENCE:")[-1].strip()
+    if not intent_raw or not conf_raw:
+        raise ValueError(f"LLM returned unexpected format: {text!r}")
+    intent     = EMOJI_MAP.get(intent_raw, f"❓ {intent_raw}")
+    confidence = float(conf_raw)
     return intent, min(max(confidence, 0.0), 1.0)
 
 

@@ -176,6 +176,45 @@ OUT_OF_SCOPE = [
     "recipe", "joke", "poem", "write an essay",
 ]
 
+# ── Module-level constants (avoids re-allocation on every query) ───────────────
+INFERENCE_TRIGGERS = [
+    "suitable for", "good for", "right for me", "fit for me",
+    "can someone", "can i join", "am i eligible", "will i qualify",
+    "should i join", "is it worth", "is this for me",
+    "non-tech", "non technical", "arts background", "commerce background",
+    "manager", "fresher", "without experience", "without degree", "without technical",
+]
+
+HALLUCINATION_PHRASES = [
+    "as of my knowledge cutoff",
+    "i don't have access",
+    "i cannot confirm",
+    "not in my training",
+    "i made up",
+    "i fabricated",
+]
+
+GENUINE_GAPS = [
+    "i don't have that specific detail",
+    "i don't have that information",
+    "not mentioned anywhere",
+    "no data available",
+    "cannot find any reference",
+]
+
+INFERABLE_PATTERNS = [
+    "suitable for", "good for", "can i join", "am i eligible",
+    "background", "experience", "non-tech", "manager", "fresher",
+    "should i", "is it worth", "will i", "can someone",
+]
+
+BROAD_QUERY_TRIGGERS = [
+    "tell me everything", "tell me about", "explain the course",
+    "explain the program", "overview", "summarize", "all about",
+    "what is this program", "describe the program", "give me details",
+    "what does this program offer", "full details", "complete information",
+]
+
 # ── Inference handler — eligibility/suitability questions ────────────────────
 KNOWN_ELIGIBILITY = """
 PGP in Applied AI & Agentic Systems — Eligibility:
@@ -268,13 +307,6 @@ def process_query(query):
         return
 
     # ── Inference routing — suitability/eligibility questions ────────────────
-    INFERENCE_TRIGGERS = [
-        "suitable for", "good for", "right for me", "fit for me",
-        "can someone", "can i join", "am i eligible", "will i qualify",
-        "should i join", "is it worth", "is this for me",
-        "non-tech", "non technical", "arts background", "commerce background",
-        "manager", "fresher", "without experience", "without degree", "without technical",
-    ]
     if any(t in query.lower() for t in INFERENCE_TRIGGERS):
         intent, confidence = detect_intent(query, llm=llm)
         _handle_inference(query, intent, confidence)
@@ -297,12 +329,6 @@ def process_query(query):
                 hint = clarification_map.get(intent, "the program")
                 st.info(f"Could you clarify — are you asking about **{hint}**? Feel free to rephrase.")
 
-            BROAD_QUERY_TRIGGERS = [
-                "tell me everything", "tell me about", "explain the course",
-                "explain the program", "overview", "summarize", "all about",
-                "what is this program", "describe the program", "give me details",
-                "what does this program offer", "full details", "complete information",
-            ]
             is_broad = any(w in query.lower() for w in BROAD_QUERY_TRIGGERS)
 
             if is_broad:
@@ -352,14 +378,6 @@ If a section has no data in context, skip it entirely. Do not invent anything.""
             return
 
         # Hallucination Guardrail — phrase-based (no second LLM call)
-        HALLUCINATION_PHRASES = [
-            "as of my knowledge cutoff",
-            "i don't have access",
-            "i cannot confirm",
-            "not in my training",
-            "i made up",
-            "i fabricated",
-        ]
         if any(p in answer.lower() for p in HALLUCINATION_PHRASES):
             answer = "⚠️ I couldn't verify this part. " + answer
 
@@ -400,19 +418,6 @@ If a section has no data in context, skip it entirely. Do not invent anything.""
         high_sources.sort(key=lambda x: x[4], reverse=True)
 
         # ── Smarter uncertainty detection & admin notification ───────────────
-        GENUINE_GAPS = [
-            "i don't have that specific detail",
-            "i don't have that information",
-            "not mentioned anywhere",
-            "no data available",
-            "cannot find any reference",
-        ]
-        INFERABLE_PATTERNS = [
-            "suitable for", "good for", "can i join", "am i eligible",
-            "background", "experience", "non-tech", "manager", "fresher",
-            "should i", "is it worth", "will i", "can someone",
-        ]
-
         is_genuinely_unknown = any(p in answer.lower() for p in GENUINE_GAPS)
         is_inferable = any(p in query.lower() for p in INFERABLE_PATTERNS)
         context_has_relevant = len(context.strip()) > 300

@@ -35,7 +35,7 @@ def hybrid_retrieve(query, db, bm25, texts, embeddings, k=5):
     bm25_top_idx = np.argsort(bm25_scores)[::-1][:k*2]
     bm25_docs = [texts[i] for i in bm25_top_idx]
 
-    # Simple merge: semantic results first, then fill with BM25 additions
+    # Ordered dedup merge: semantic results take priority, BM25 fills remaining slots
     seen = set()
     merged = []
     for doc in semantic_docs + bm25_docs:

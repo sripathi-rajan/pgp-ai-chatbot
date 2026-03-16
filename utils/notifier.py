@@ -1,3 +1,4 @@
+import html
 import smtplib
 import json
 import os
@@ -79,17 +80,20 @@ def notify_admin(query: str, chat_history: list, answer_attempt: str) -> None:
     msg["From"]    = smtp_user
     msg["To"]      = admin_email
 
-    html = f"""
+    safe_query   = html.escape(query)
+    safe_history = html.escape(history_text)
+    safe_answer  = html.escape(answer_attempt[:800])
+    html_body = f"""
     <html><body style="font-family:sans-serif;line-height:1.6;">
     <h3 style="color:#c0392b;">&#9888; Unanswered Query Alert</h3>
     <p><strong>Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M IST')}</p>
-    <p><strong>Query:</strong> {query}</p>
+    <p><strong>Query:</strong> {safe_query}</p>
     <hr>
     <p><strong>Recent chat history:</strong></p>
-    <pre style="background:#f4f4f4;padding:10px;border-radius:4px;font-size:13px;">{history_text}</pre>
+    <pre style="background:#f4f4f4;padding:10px;border-radius:4px;font-size:13px;">{safe_history}</pre>
     <hr>
     <p><strong>Bot's attempted answer:</strong></p>
-    <pre style="background:#f4f4f4;padding:10px;border-radius:4px;font-size:13px;">{answer_attempt[:800]}</pre>
+    <pre style="background:#f4f4f4;padding:10px;border-radius:4px;font-size:13px;">{safe_answer}</pre>
     <hr>
     <p style="color:#888;font-size:12px;">
       Review &amp; add answers at the Admin Panel page in the app sidebar.<br>
@@ -97,7 +101,7 @@ def notify_admin(query: str, chat_history: list, answer_attempt: str) -> None:
     </p>
     </body></html>
     """
-    msg.attach(MIMEText(html, "html"))
+    msg.attach(MIMEText(html_body, "html"))
 
     # Try STARTTLS port 587 first (required for Gmail App Passwords)
     try:
