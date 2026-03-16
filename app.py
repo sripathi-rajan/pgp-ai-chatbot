@@ -1,13 +1,16 @@
+import html as _html
 import os
 import re
 import threading
 import streamlit as st
 
 # Read API keys
-groq_key = st.secrets.get("GROQ_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
-os.environ["GROQ_API_KEY"] = groq_key
+openai_key = st.secrets.get("OPENAI_API_KEY", "") or os.environ.get("OPENAI_API_KEY", "")
+os.environ["OPENAI_API_KEY"] = openai_key
 
 serper_key = st.secrets.get("SERPER_API_KEY") or os.environ.get("SERPER_API_KEY")
+if not serper_key:
+    print("[WARN] SERPER_API_KEY not set — web search fallback disabled")
 os.environ["SERPER_API_KEY"] = serper_key or ""
 
 # Import our modules
@@ -89,8 +92,11 @@ def display_sources(high_sources, low_sources):
 
     with st.expander("📄 Sources used to answer"):
         for page_num, title, sentence, full_chunk, relevance, source_url in high_sources:
-            has_url = "http" in str(source_url)
-            filename = str(source_url).split("/")[-1].split("\\")[-1] if source_url else "Document"
+            raw_url = str(source_url) if source_url else ""
+            # Only allow http/https URLs — strip anything else to prevent javascript: URIs
+            safe_url = raw_url if raw_url.startswith(("http://", "https://")) else ""
+            has_url = bool(safe_url)
+            filename = raw_url.split("/")[-1].split("\\")[-1] if raw_url else "Document"
             score_pct = f"{relevance:.0%}"
             badge = f"🟢 {score_pct}" if relevance > 0.5 else f"🟡 {score_pct}"
             page_display = f"Page {page_num}" if str(page_num) != "?" else "PDF"
@@ -98,23 +104,26 @@ def display_sources(high_sources, low_sources):
             if has_url:
                 # Web/scraped source — full clickable card
                 color = "#1D9E75" if relevance > 0.5 else "#3B8BD4"
-                preview = " ".join(sentence.split())[:120]
+                preview = _html.escape(" ".join(sentence.split())[:120])
+                safe_title = _html.escape(title)
+                safe_url_attr = _html.escape(safe_url, quote=True)
+                ellipsis = "..." if len(sentence) > 120 else ""
                 st.markdown(f"""
-                <a href="{source_url}" target="_blank" style="text-decoration:none;">
+                <a href="{safe_url_attr}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
                 <div style="border:0.5px solid #e0e0e0;border-left:4px solid {color};
                             border-radius:8px;padding:14px 16px;margin-bottom:10px;cursor:pointer;"
                      onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.12)'"
                      onmouseout="this.style.boxShadow='none'">
                     <div style="display:flex;justify-content:space-between;
                                 align-items:center;margin-bottom:8px;">
-                        <span style="font-size:13px;font-weight:600;color:{color};">{title}</span>
+                        <span style="font-size:13px;font-weight:600;color:{color};">{safe_title}</span>
                         <span style="font-size:11px;color:{color};background:{color}18;
                                      padding:2px 8px;border-radius:10px;">
                             {badge} · 🔗 View source
                         </span>
                     </div>
-                    <div style="font-size:11px;color:#999;margin-bottom:6px;">🌐 {source_url}</div>
-                    <div style="font-size:13px;line-height:1.7;color:#333;">{preview}{"..." if len(sentence) > 120 else ""}</div>
+                    <div style="font-size:11px;color:#999;margin-bottom:6px;">🌐 {_html.escape(safe_url)}</div>
+                    <div style="font-size:13px;line-height:1.7;color:#333;">{preview}{ellipsis}</div>
                 </div>
                 </a>
                 """, unsafe_allow_html=True)
@@ -137,19 +146,22 @@ def display_sources(high_sources, low_sources):
                 unsafe_allow_html=True
             )
             for page_num, title, source_url in low_sources:
-                has_url = "http" in str(source_url)
+                raw_url = str(source_url) if source_url else ""
+                safe_url = raw_url if raw_url.startswith(("http://", "https://")) else ""
+                has_url = bool(safe_url)
                 if has_url:
                     st.markdown(
                         f"<div style='font-size:12px;color:#888;padding:4px 0;'>"
-                        f"· <a href='{source_url}' target='_blank' style='color:#3B8BD4;'>"
-                        f"{title}</a> — {source_url}</div>",
+                        f"· <a href='{_html.escape(safe_url, quote=True)}' target='_blank'"
+                        f" rel='noopener noreferrer' style='color:#3B8BD4;'>"
+                        f"{_html.escape(title)}</a> — {_html.escape(safe_url)}</div>",
                         unsafe_allow_html=True
                     )
                 else:
                     page_display = f"Page {page_num}" if str(page_num) != "?" else "PDF"
                     st.markdown(
                         f"<div style='font-size:12px;color:#888;padding:4px 0;'>"
-                        f"· {title} — {page_display}</div>",
+                        f"· {_html.escape(title)} — {page_display}</div>",
                         unsafe_allow_html=True
                     )
 
@@ -216,28 +228,29 @@ BROAD_QUERY_TRIGGERS = [
 ]
 
 # ── Inference handler — eligibility/suitability questions ────────────────────
-KNOWN_ELIGIBILITY = """
-PGP in Applied AI & Agentic Systems — Eligibility:
-- Educational: BCA / B.Tech / BE or equivalent degree
-- Background: STEM preferred, but strong analytical aptitude from any discipline considered
-- Experience: Open to freshers (recent graduates) AND working professionals up to 5 years
-- Technical: Curiosity and comfort with technology required
-- Mindset: Problem-solving, logical thinking, ability to interpret patterns
-- Non-tech backgrounds: Accepted if they demonstrate strong analytical and quantitative aptitude
-- Managers/Professionals: Eligible under the weekend/online track designed for working professionals
-"""
-
 def _handle_inference(query, intent, confidence):
+    # Fetch eligibility context live from the knowledge base so answers
+    # always reflect the latest brochure / program_data.txt content.
+    eligibility_docs = hybrid_retrieve(
+        "eligibility criteria background experience requirements STEM apply",
+        db, bm25, texts, embeddings, k=4
+    )
+    eligibility_context = "\n\n".join(eligibility_docs) if eligibility_docs else (
+        "No eligibility context found — please contact pgadmissions@mastersunion.org"
+    )
+
     inference_prompt = f"""You are a helpful admissions counselor for Masters' Union.
 
-Using the eligibility criteria below, answer the user's question with clear reasoning.
+Using the eligibility context retrieved from the program knowledge base below, \
+answer the user's question with clear reasoning.
 - Be direct: say YES, NO, or POSSIBLY with a brief explanation.
 - Mention what specifically makes them eligible or ineligible.
 - If borderline, explain what would strengthen their application.
 - Keep it under 5 sentences. No sources needed — this is your expert assessment.
+- If the context does not contain enough information, say so honestly.
 
-ELIGIBILITY CRITERIA:
-{KNOWN_ELIGIBILITY}
+ELIGIBILITY CONTEXT (from knowledge base):
+{eligibility_context}
 
 USER QUESTION: {query}
 
@@ -495,10 +508,10 @@ with st.sidebar:
 
     st.divider()
     st.caption("🧠 Powered by")
-    st.caption("• Qwen3 1.7B / Llama 3.3 70B (LLM)")
+    st.caption("• GPT-4o-mini / Qwen3 1.7B (LLM)")
     st.caption("• Whisper (Voice)")
     st.caption("• MiniLM-L6 (Embeddings)")
-    st.caption("• BM25 + RRF (Hybrid)")
+    st.caption("• BM25 + Hybrid Retrieval")
     st.caption("• pdfplumber (PDF)")
 
 # ── Chat History Display ──────────────────────────────────────────────────────

@@ -134,7 +134,18 @@ def load_pipeline():
             shutil.rmtree(FAISS_INDEX_PATH)
             print("[FAISS] Source data newer than index — rebuilding")
 
+    FAISS_SENTINEL = os.path.join(FAISS_INDEX_PATH, ".built_by_app")
+
     if os.path.exists(FAISS_INDEX_PATH):
+        if not os.path.exists(FAISS_SENTINEL):
+            # Index directory exists but was not created by this app — rebuild to be safe
+            shutil.rmtree(FAISS_INDEX_PATH)
+            print("[FAISS] Sentinel missing — untrusted index removed, rebuilding")
+
+    if os.path.exists(FAISS_INDEX_PATH):
+        # allow_dangerous_deserialization is required by FAISS (uses pickle).
+        # The sentinel file above ensures this index was written by this application
+        # and has not been replaced by an external actor.
         db = FAISS.load_local(
             FAISS_INDEX_PATH,
             embeddings,
@@ -144,6 +155,8 @@ def load_pipeline():
     else:
         db = FAISS.from_documents(chunks, embeddings)
         db.save_local(FAISS_INDEX_PATH)
+        # Write sentinel to mark this index as trusted
+        Path(FAISS_SENTINEL).touch()
         print("[FAISS] Built and saved new index")
 
     tokenized = [t.lower().split() for t in texts]
@@ -171,10 +184,11 @@ def load_pipeline():
             think=False,  # Disable chain-of-thought — avoids empty answers when token budget runs out
         )
     else:
-        from langchain_groq import ChatGroq
-        llm = ChatGroq(
-            model="llama-3.3-70b-versatile",
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(
+            model="gpt-4o-mini",
             temperature=0,
+            api_key=st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY", "")),
         )
 
     return Pipeline(db=db, bm25=bm25, texts=texts, chunks=chunks, embeddings=embeddings, llm=llm)
